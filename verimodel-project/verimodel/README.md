@@ -1,140 +1,283 @@
-# 🛡️ VeriModel (AI Supply Chain Firewall)
+# 🛡️ VeriModel - AI Supply Chain Firewall
 
-**VeriModel** là một công cụ bảo mật Giao diện Dòng lệnh (CLI) hoạt động như một "tường lửa" 🧱. Nó cho phép các nhà phát triển và kỹ sư AI/ML quét các tệp mô hình (như `.pkl`, `.pth`) để phát hiện mã độc *trước khi* tải chúng vào môi trường làm việc.
+[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-## 1\. 🚨 Vấn đề (The Problem)
+**VeriModel** là một công cụ bảo mật CLI (Command-Line Interface) được thiết kế để quét và phát hiện mã độc hại trong các file mô hình AI dựa trên pickle (`.pkl`, `.pth`). Công cụ này hoạt động như một "tường lửa" cho chuỗi cung ứng AI/ML, bảo vệ bạn khỏi các cuộc tấn công Remote Code Execution (RCE) tiềm ẩn.
 
-Ngành công nghiệp AI/ML đang bùng nổ, và các nhà phát triển thường xuyên tải về các mô hình huấn luyện sẵn từ các nguồn mở như Hugging Face hay GitHub.
+---
 
-  * Phần lớn các mô hình này được lưu trữ dưới định dạng `pickle` của Python (`.pkl`, `.pth`).
-  * Định dạng `pickle` vốn dĩ **không an toàn**.
-  * Việc `pickle.load()` một tệp từ nguồn không tin cậy có thể dẫn đến lỗ hổng **Thực thi Mã Từ xa (RCE)** 👾, cho phép kẻ tấn công chiếm toàn quyền kiểm soát máy chủ của bạn.
-  * Đây là một "lỗ hổng mù" (blind spot) khổng lồ trong chuỗi cung ứng phần mềm AI.
+## 🎯 Vấn đề
 
-## 2\. 💡 Giải pháp (The Solution)
+Ngành công nghiệp AI/ML đang phát triển bùng nổ với hàng triệu mô hình được chia sẻ trên các nền tảng như Hugging Face, GitHub. Phần lớn các mô hình này sử dụng định dạng **pickle** của Python - một định dạng serialization **vốn dĩ không an toàn**.
 
-VeriModel quét các tệp mô hình đáng ngờ bằng cách sử dụng hai cấp độ phân tích:
+### Tại sao pickle nguy hiểm?
 
-1.  **🔬 Quét Tĩnh (Static Analysis):** Phân tích an toàn bytecode của tệp `pickle` mà không thực thi nó. Công cụ tìm kiếm các opcode và các hàm `import` nguy hiểm (ví dụ: `os.system`, `subprocess.run`) có thể chỉ ra ý đồ RCE.
-2.  \*\* sandbox (Dynamic Analysis):\*\* Thực thi (tải) mô hình một cách an toàn trong một môi trường sandbox bị cô lập (chỉ trên Linux). Công cụ sử dụng `strace` để giám sát chặt chẽ các hành vi độc hại như gọi mạng, thực thi lệnh con, hoặc truy cập tệp hệ thống.
+Khi bạn tải một file pickle từ nguồn không tin cậy bằng `pickle.load()`, bạn thực chất đang **thực thi mã tùy ý** từ file đó. Điều này có thể dẫn đến:
 
-## 3\. 🎬 Demo (Cách hoạt động)
+- 🚨 **Remote Code Execution (RCE)**: Kẻ tấn công chiếm quyền kiểm soát hệ thống
+- 🌐 **Exfiltration dữ liệu**: Đánh cắp thông tin nhạy cảm
+- 💣 **Backdoor**: Cài đặt mã độc vĩnh viễn
+- 🔓 **Privilege escalation**: Leo thang đặc quyền
 
-VeriModel được thiết kế để đưa ra cảnh báo rõ ràng khi phát hiện mối đe dọa.
+---
 
-*(Lưu ý: Bạn nên thay thế khối mã bên dưới bằng một video demo `asciinema` như đã đề cập trong tài liệu)*
+## 💡 Giải pháp
 
-```sh
-$ # 1. Quét một model an toàn
-$ verimodel scan demo_models/good_model.pkl
-🔍 Đang quét file: good_model.pkl
+**VeriModel** cung cấp **hai lớp phân tích bảo mật**:
 
-╭────────────────── Kết quả Quét VeriModel ──────────────────────────────────────────────╮
-│ Loại Quét                 │ Trạng thái   │                 Phát hiện                   │
-├───────────────────────────┼──────────────┼─────────────────────────────────────────────┤
-│ Quét Tĩnh (Pickletools)   │ ✅ An toàn   │    Không tìm thấy opcode nguy hiểm.         │
-│ Quét Động (strace/Linux)  │ ✅ An toàn   │ Không phát hiện hành vi hệ thống đáng ngờ.  │
-╰────────────────────────────────────────────────────────────────────────────────────────╯
+### 1️⃣ Static Analysis (Quét Tĩnh)
+- Phân tích bytecode pickle **mà không thực thi**
+- Phát hiện các opcode và import nguy hiểm (ví dụ: `os.system`, `subprocess.run`)
+- An toàn 100% - không có rủi ro thực thi mã
 
-[bold green]✅ An toàn: Không phát hiện mối đe dọa nào. File có vẻ an toàn để tải.[/bold green]
+### 2️⃣ Dynamic Analysis (Quét Động) - _Chỉ Linux_
+- Thực thi mô hình trong môi trường **sandbox được giám sát**
+- Sử dụng `strace` để theo dõi system calls
+- Phát hiện hành vi thực tế: kết nối mạng, thực thi lệnh, ghi file
 
-$ # 2. Quét một model chứa mã RCE
-$ verimodel scan demo_models/malicious_rce_model.pkl
-🔍 Đang quét file: malicious_rce_model.pkl
+---
 
-╭────────────────── Kết quả Quét VeriModel ───────────────────────────────────────────────────╮
-│ Loại Quét                 │ Trạng thái    │ Phát hiện                                       │
-├───────────────────────────┼───────────────┼─────────────────────────────────────────────────┤
-│ Quét Tĩnh (Pickletools)   │ ❌ NGUY HIỂM  │ • Phát hiện GLOBAL opcode nguy hiểm: os.system  │
-│ Quét Động (strace/Linux)  │ ❌ NGUY HIỂM  │ • Phát hiện syscall thực thi lệnh (execve)!     │
-╰─────────────────────────────────────────────────────────────────────────────────────────────╯
+## 🚀 Cài đặt
 
-[bold red]⚠️ CẢNH BÁO: Đã phát hiện mối đe dọa tiềm ẩn. KHÔNG tải file này.[/bold red]
+### Yêu cầu
 
-$ # 3. Quét một model cố gắng kết nối mạng
-$ verimodel scan demo_models/malicious_network_model.pkl
-🔍 Đang quét file: malicious_network_model.pkl
+- Python 3.10 trở lên
+- Linux (cho quét động - tùy chọn)
+- `strace` (cho quét động trên Linux)
 
-╭────────────────── Kết quả Quét VeriModel ──────────────────────────────────────────────────────╮
-│ Loại Quét                 │ Trạng thái    │ Phát hiện                                          │
-├───────────────────────────┼───────────────┼────────────────────────────────────────────────────┤
-│ Quét Tĩnh (Pickletools)   │ ❌ NGUY HIỂM  │ • Phát hiện GLOBAL opcode nguy hiểm: socket.socket │
-│ Quét Động (strace/Linux)  │ ❌ NGUY HIỂM  │ • Phát hiện syscall gọi mạng (connect)!            │
-╰────────────────────────────────────────────────────────────────────────────────────────────────╯
-
-[bold red]⚠️ CẢNH BÁO: Đã phát hiện mối đe dọa tiềm ẩn. KHÔNG tải file này.[/bold red]
-```
-
-## 4\. 🚀 Cài đặt (Installation)
-
-Dự án này sử dụng [Poetry](https://python-poetry.org/) để quản lý các thư viện.
+### Cài đặt từ source
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/your-username/verimodel.git
+# Clone repository
+git clone https://github.com/yourusername/verimodel.git
 cd verimodel
 
-# 2. Cài đặt các thư viện (dùng Poetry)
+# Cài đặt Poetry (nếu chưa có)
+curl -sSL https://install.python-poetry.org | python3 -
+
+# Cài đặt dependencies
 poetry install
 
-# 3. Kích hoạt môi trường ảo
+# Kích hoạt virtual environment
 poetry shell
-
-# 4. (Tùy chọn) Tạo các model độc hại để demo
-poetry run python generate_malicious_models.py
 ```
 
-## 5\. 💻 Sử dụng (Usage)
-
-Sau khi cài đặt, bạn có thể chạy lệnh `scan` trên bất kỳ tệp nào.
+### Cài đặt strace (cho Linux)
 
 ```bash
-verimodel scan /path/to/your/model.pkl
+# Ubuntu/Debian
+sudo apt-get install strace
+
+# Fedora/RHEL
+sudo dnf install strace
+
+# Arch Linux
+sudo pacman -S strace
 ```
 
-Sử dụng các tệp demo đã tạo để kiểm tra:
+---
+
+## 📖 Sử dụng
+
+### Quét một file pickle
 
 ```bash
+# Quét đầy đủ (static + dynamic)
+verimodel scan model.pkl
+
+# Chỉ quét tĩnh (nhanh hơn, an toàn hơn)
+verimodel scan model.pkl --static-only
+
+# Chỉ quét động (Linux only)
+verimodel scan model.pkl --dynamic-only
+
+# Quét với chi tiết đầy đủ
+verimodel scan model.pkl --verbose
+
+# Quét với timeout tùy chỉnh
+verimodel scan model.pkl --timeout 10
+```
+
+### Xem thông tin file
+
+```bash
+verimodel info model.pkl
+```
+
+### Hiển thị phiên bản
+
+```bash
+verimodel --version
+```
+
+---
+
+## 🧪 Demo
+
+### Tạo các file demo
+
+Dự án bao gồm một script để tạo các file pickle độc hại cho mục đích demo:
+
+```bash
+python generate_malicious_models.py
+```
+
+Script này sẽ tạo ra 5 file trong thư mục `demo_models/`:
+
+1. ✅ `good_model.pkl` - Model an toàn (baseline)
+2. 🚨 `malicious_rce_model.pkl` - RCE payload (os.system)
+3. 🚨 `malicious_network_model.pkl` - Network connection
+4. 🚨 `malicious_filewrite_model.pkl` - File system write
+5. 🚨 `malicious_subprocess_model.pkl` - Subprocess spawn
+
+### Chạy demo
+
+```bash
+# Quét file an toàn
 verimodel scan demo_models/good_model.pkl
+
+# Quét file RCE
 verimodel scan demo_models/malicious_rce_model.pkl
-verimodel scan demo_models/malicious_network_model.pkl
+
+# Quét file network
+verimodel scan demo_models/malicious_network_model.pkl -v
 ```
 
-## 6\. 🛠️ Ngăn xếp Công nghệ (Tech Stack)
+### Kết quả mẫu
 
-Dự án này được xây dựng với các công cụ mã nguồn mở và miễn phí.
+**File an toàn:**
+```
+✅ KẾT LUẬN: FILE AN TOÀN
+Không phát hiện mã độc hại hoặc hành vi nguy hiểm.
+```
 
-| Thành phần | Công nghệ | Lý do lựa chọn |
-| :--- | :--- | :--- |
-| 🐍 Ngôn ngữ | Python 3.10+ | Hệ sinh thái AI/ML và bảo mật mạnh mẽ. |
-| 🖥️ Giao diện CLI | Typer, Rich | Tạo CLI chuyên nghiệp, đẹp mắt cực kỳ nhanh chóng. |
-| 📦 Quản lý Package | Poetry | Tiêu chuẩn hiện đại, thay thế `requirements.txt`. |
-| 🔍 Quét Tĩnh | `pickletools` | Thư viện chuẩn của Python, an toàn để phân tích pickle. |
-| 🕵️ Quét Động | `strace` (Linux), `subprocess` | Tận dụng công cụ hệ thống mạnh mẽ, không cần code sandbox phức tạp. |
-| 📹 Demo | `asciinema` | Tạo file GIF demo cho README.md. |
+**File độc hại:**
+```
+🚨 KẾT LUẬN: FILE NGUY HIỂM
+  • Quét tĩnh phát hiện 2 mối đe dọa
+  • Quét động phát hiện 1 hành vi nguy hiểm
 
-## 7\. 🎯 Phạm vi Dự án (MVP Scope)
+⚠️  KHUYẾN NGHỊ:
+  • KHÔNG tải (load) file này vào môi trường production
+  • Xem xét nguồn gốc của file
+  • Sử dụng định dạng an toàn hơn như .safetensors
+```
 
-Đây là một dự án Sản phẩm Khả thi Tối thiểu (MVP) với mục tiêu tạo ra một công cụ ấn tượng và có khả năng trình diễn rõ ràng.
+---
 
-| Trong Phạm vi (In-Scope) | Ngoài Phạm vi (Out-of-Scope) |
-| :--- | :--- |
-| ✅ Quét tĩnh các file `.pkl`. | ❌ Hỗ trợ quét động trên Windows / macOS. |
-| ✅ Quét động các file `.pkl` **chỉ trên Linux**. | ❌ Phân tích sâu các định dạng khác (`.h5`, `.onnx`). |
-| ✅ Giao diện CLI (sử dụng Typer/Rich). | ❌ Hỗ trợ `.safetensors` (vì vốn đã an toàn). |
-| ✅ Đóng gói thành một package Python (qua Poetry). | ❌ Giao diện người dùng Web (GUI). |
-| ✅ Tạo các mô hình độc hại mẫu để demo. | ❌ Tích hợp tự động vào các hệ thống CI/CD. |
+## 🏗️ Kiến trúc
 
-## 8\. 🌟 Tại sao dự án này quan trọng?
+```
+verimodel/
+├── verimodel/
+│   ├── __init__.py           # Package initialization
+│   ├── cli.py                # CLI interface (Typer + Rich)
+│   ├── static_scanner.py     # Static bytecode analysis
+│   └── dynamic_scanner.py    # Dynamic sandbox execution
+├── demo_models/              # Demo pickle files
+├── generate_malicious_models.py  # Demo file generator
+├── pyproject.toml            # Poetry configuration
+└── README.md                 # This file
+```
 
-Dự án này giải quyết một vấn đề thực tế, cấp bách trong cộng đồng AI/ML.
+### Tech Stack
 
-Đối với hồ sơ cá nhân, đây là một "dự án điểm nhấn" hoàn hảo, chứng minh bộ kỹ năng "3 trong 1" cực kỳ hiếm:
+- **Python 3.10+**: Core language
+- **Typer + Rich**: Professional CLI with beautiful output
+- **Poetry**: Modern dependency management
+- **pickletools**: Safe pickle bytecode analysis
+- **strace**: System call monitoring (Linux)
 
-  * **🔒 Bảo mật (Security):** Hiểu biết về lỗ hổng, phân tích bytecode, sandbox.
-  * **🧠 AI/ML:** Hiểu biết về chuỗi cung ứng, các định dạng mô hình.
-  * **🏗️ Kỹ thuật Phần mềm (Software Engineering):** Xây dựng công cụ CLI chuyên nghiệp, đóng gói, tài liệu.
+---
 
-## 9\. 📄 Giấy phép (License)
+## 🔍 Cách hoạt động
 
-Dự án này được cấp phép theo Giấy phép MIT.
+### Static Scanner
+
+1. Mở file pickle ở chế độ binary read
+2. Sử dụng `pickletools.genops()` để duyệt bytecode
+3. Tìm kiếm các GLOBAL opcode (import statements)
+4. So sánh với danh sách đen các hàm nguy hiểm
+5. Phát hiện REDUCE opcode (có thể thực thi)
+
+**Danh sách đen bao gồm:**
+- `os.system`, `os.popen`, `os.exec*`
+- `subprocess.*`
+- `eval`, `exec`, `compile`
+- `socket.socket`, `urllib.*`, `requests.*`
+
+### Dynamic Scanner (Linux only)
+
+1. Tạo script loader tạm thời
+2. Thực thi script với `strace` để monitor syscalls
+3. Phân tích log để tìm các syscall nguy hiểm:
+   - `connect`, `sendto` (network)
+   - `execve`, `fork`, `clone` (process)
+   - `open`, `unlink`, `rename` (file operations)
+4. Báo cáo các hành vi đáng ngờ
+
+---
+
+## ⚠️ Giới hạn
+
+- **Quét động chỉ hỗ trợ Linux**: Windows/macOS không hỗ trợ strace
+- **Không phân tích .safetensors**: Định dạng này đã an toàn từ thiết kế
+- **Không hỗ trợ .h5, .onnx**: Chỉ tập trung vào pickle
+- **False positives có thể xảy ra**: Một số model hợp lệ có thể trigger cảnh báo
+- **Không thể phát hiện 100%**: Kẻ tấn công tinh vi có thể bypass
+
+---
+
+## 🤝 Đóng góp
+
+Contributions are welcome! Vui lòng:
+
+1. Fork repository
+2. Tạo feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Mở Pull Request
+
+---
+
+## 📜 License
+
+Dự án này được phân phối dưới giấy phép MIT. Xem file `LICENSE` để biết thêm chi tiết.
+
+---
+
+## 🙏 Acknowledgments
+
+- **Pickle Security Research**: Các nghiên cứu về lỗ hổng pickle
+- **Hugging Face**: Cảm hứng từ các vấn đề an toàn mô hình
+- **Python Security Community**: Các best practices và patterns
+
+---
+
+## 📚 Tài liệu tham khảo
+
+- [Python Pickle Documentation](https://docs.python.org/3/library/pickle.html)
+- [Exploiting Python Pickles](https://davidhamann.de/2020/04/05/exploiting-python-pickle/)
+- [ML Model Security](https://github.com/EthicalML/awesome-production-machine-learning#model-security)
+
+---
+
+## 💬 Liên hệ
+
+**Tác giả**: Your Name
+
+**Email**: your.email@example.com
+
+**GitHub**: [@yourusername](https://github.com/yourusername)
+
+---
+
+## ⭐ Star History
+
+Nếu dự án này hữu ích cho bạn, hãy cho nó một ⭐ trên GitHub!
+
+---
+
+**Disclaimer**: Công cụ này được tạo ra cho mục đích giáo dục và nghiên cứu. Không sử dụng để tấn công hoặc làm hại hệ thống của người khác. Tác giả không chịu trách nhiệm về việc sử dụng sai mục đích.
