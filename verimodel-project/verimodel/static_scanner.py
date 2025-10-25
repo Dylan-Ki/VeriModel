@@ -65,4 +65,93 @@ class StaticScanner:
                     "warnings": [],
                     "details": [],
                 }
-            if 
+            threats = []
+            warnings = []
+            details = []
+            
+            try: 
+                with open(file_path, "rb") as f:
+                    #Phân tích bytecode pickle
+                    opcodes = list(pickletools.genops(f))
+                    
+                    for opcode, arg, pos in opcodes:
+                        details = {
+                            "position": pos,
+                            "opcode": opcode.name,
+                            "arg": str(arg) if arg else None,
+                        }
+                        details.append(details)
+                        
+                        #Kiểm tra GLOBAL opcode (import module/function)
+                        if opcode.name =="GLOBAL":
+                            module_func = arg if isinstance(arg, str) else join(arg)
+                            
+                            #Kiểm tra trong danh sách đen
+                            if any(dangerous in module_func for dangerous in self.DANGEROUS_IMPORTS):
+                                threats.append(
+                                    {
+                                    
+                                
+                                        "type": "DANGEROUS_IMPORT",
+                                        "severity": "HIGH",
+                                        "description": f"Phát hiện import đáng ngờ/nguy hiểm: {module_func}",
+                                        "position": pos,
+                                        "opcode": opcode.name,
+                                        "argument": module_func,
+                                    }
+                                )
+                        #Kiểm tra REDUCE opcode (có thể thực thi hàm)
+                        elif any(susp in module_func for susp in self.SUSPICIOUS_IMPORTS):
+                            warnings.append(
+                                {
+                                    "type": "SUSPICIOUS_IMPORT",
+                                    "severity": "MEDIUM",
+                                    "description": f"Phát hiện import nghi ngờ: {module_func}",
+                                    "position": pos,
+                                    "opcode": opcode.name,
+                                    "argument": module_func,
+                                }
+                            )
+                            
+            except Exception as e:
+                return {
+                    "is_safe": False,
+                    "error": f"Lỗi khi quét file: {str(e)}",
+                    "threats": [],
+                    "warnings": [],
+                    "details": [],
+                }
+                
+        #Kết luận
+        is_safe = len(threats) == 0
+        
+        return {
+            "is_safe": is_safe,
+            "threats": threats,
+            "warnings": warnings,
+            "details": details,
+            "total_threats": len(opcode),
+        }
+        
+    def get_summary(self, result: Dict) -> str:
+        """Tạo tóm tắt kết quả quét tĩnh
+        Args:
+            result (Dict): Kết quả quét tĩnh từ scan_file
+        Returns:
+            str: Tóm tắt kết quả quét
+        """
+        if result.get("error"):
+            return f"❌ LỖI: {result['error']}"
+        
+        
+        threats = result.get("threats", [])
+        warnings = result.get("warnings", [])
+        
+        
+        if result["is_safe"]:
+            if warnings:
+                return f"⚠️  CẢNH BÁO: Tìm thấy {len(warnings)} cảnh báo (không chắc chắn nguy hiểm)"
+            else:
+                return "✅ AN TOÀN: Không phát hiện mã độc hại"
+        else:
+            return f"🚨 NGUY HIỂM: Phát hiện {len(threats)} mối đe dọa"
