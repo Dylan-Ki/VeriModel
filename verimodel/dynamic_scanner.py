@@ -84,4 +84,6 @@ import sys
 import pickle
 
 try: 
-    with open
+    with open('{file_path}', 'rb') as f:
+        obj = pickle.load(f)
+    pri3
