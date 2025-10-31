@@ -453,7 +453,27 @@ class VeriModelGUI:
                     
         return None
 
-if __name__ == "__main__":
+def main():
     root = tk.Tk()
+    # Set window icon
+    try:
+        ico_path = Path(__file__).parent / "shield.ico"
+        if ico_path.exists():
+            root.iconbitmap(ico_path)
+    except:
+        pass  # Skip icon if not found
+        
+    # Center window
+    window_width = 800
+    window_height = 600
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    center_x = int(screen_width/2 - window_width/2)
+    center_y = int(screen_height/2 - window_height/2)
+    root.geometry(f'{window_width}x{window_height}+{center_x}+{center_y}')
+    
     app = VeriModelGUI(root)
     root.mainloop()
+
+if __name__ == "__main__":
+    main()
