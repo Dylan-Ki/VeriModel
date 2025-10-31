@@ -47,61 +47,61 @@ class StaticScanner:
     def __init__(self):
         self.findings: list[Dict] = []
         
-    def scan_file(self, file_path: str) -> Dict:
+    def scan_file(self, file_path: Path) -> Dict:
         """Quét tĩnh file pickle
         Args:
             file_path (str): Đường dẫn tới file pickle
-            Returns:
-                Dict: Chứa kết quả quét tĩnh (is.safe, threats, warnings, details)
-                """
-            self.findings = []
-            file_path = Path(file_path)
-            
-            if not file_path.suffix.lower() in [".pkl", ".pickle", ".pth"]:
-                return {
-                    "is_safe": False,
-                    "error": "File không tồn tại: {file_path}",
-                    "threats": [],
-                    "warnings": [],
-                    "details": [],
-                }
-            threats = []
-            warnings = []
-            details = []
-            
-            try: 
-                with open(file_path, "rb") as f:
-                    #Phân tích bytecode pickle
-                    opcodes = list(pickletools.genops(f))
-                    
-                    for opcode, arg, pos in opcodes:
-                        details = {
-                            "position": pos,
-                            "opcode": opcode.name,
-                            "arg": str(arg) if arg else None,
-                        }
-                        details.append(details)
-                        
-                        #Kiểm tra GLOBAL opcode (import module/function)
-                        if opcode.name =="GLOBAL":
-                            module_func = arg if isinstance(arg, str) else join(arg)
-                            
-                            #Kiểm tra trong danh sách đen
-                            if any(dangerous in module_func for dangerous in self.DANGEROUS_IMPORTS):
-                                threats.append(
-                                    {
-                                    
-                                
-                                        "type": "DANGEROUS_IMPORT",
-                                        "severity": "HIGH",
-                                        "description": f"Phát hiện import đáng ngờ/nguy hiểm: {module_func}",
-                                        "position": pos,
-                                        "opcode": opcode.name,
-                                        "argument": module_func,
-                                    }
-                                )
-                        #Kiểm tra REDUCE opcode (có thể thực thi hàm)
-                        elif any(susp in module_func for susp in self.SUSPICIOUS_IMPORTS):
+        Returns:
+            Dict: Chứa kết quả quét tĩnh (is.safe, threats, warnings, details)
+        """
+        self.findings = []
+        file_path = Path(file_path)
+
+        if not file_path.suffix.lower() in [".pkl", ".pickle", ".pth"]:
+            return {
+                "is_safe": False,
+                "error": f"File không đúng định dạng: {file_path}",
+                "threats": [],
+                "warnings": [],
+                "details": [],
+            }
+
+        threats = []
+        warnings = []
+        details = []
+
+        try:
+            with open(file_path, "rb") as f:
+                # Phân tích bytecode pickle
+                opcodes = list(pickletools.genops(f))
+
+                for opcode, arg, pos in opcodes:
+                    detail = {
+                        "position": pos,
+                        "opcode": opcode.name,
+                        "arg": str(arg) if arg else None,
+                    }
+                    details.append(detail)
+
+                    module_func = None
+                    if opcode.name == "GLOBAL":
+                        module_func = arg if isinstance(arg, str) else None
+                        # Kiểm tra trong danh sách đen
+                        if module_func and any(dangerous in module_func for dangerous in self.DANGEROUS_IMPORTS):
+                            threats.append(
+                                {
+                                    "type": "DANGEROUS_IMPORT",
+                                    "severity": "HIGH",
+                                    "description": f"Phát hiện import đáng ngờ/nguy hiểm: {module_func}",
+                                    "position": pos,
+                                    "opcode": opcode.name,
+                                    "argument": module_func,
+                                }
+                            )
+                    elif opcode.name == "REDUCE":
+                        # REDUCE có thể thực thi hàm, kiểm tra arg nếu là str
+                        module_func = arg if isinstance(arg, str) else None
+                        if module_func and any(susp in module_func for susp in self.SUSPICIOUS_IMPORTS):
                             warnings.append(
                                 {
                                     "type": "SUSPICIOUS_IMPORT",
@@ -112,25 +112,25 @@ class StaticScanner:
                                     "argument": module_func,
                                 }
                             )
-                            
-            except Exception as e:
-                return {
-                    "is_safe": False,
-                    "error": f"Lỗi khi quét file: {str(e)}",
-                    "threats": [],
-                    "warnings": [],
-                    "details": [],
-                }
-                
-        #Kết luận
+
+        except Exception as e:
+            return {
+                "is_safe": False,
+                "error": f"Lỗi khi quét file: {str(e)}",
+                "threats": [],
+                "warnings": [],
+                "details": [],
+            }
+
+        # Kết luận
         is_safe = len(threats) == 0
-        
+
         return {
             "is_safe": is_safe,
             "threats": threats,
             "warnings": warnings,
             "details": details,
-            "total_threats": len(opcode),
+            "total_threats": len(threats),
         }
         
     def get_summary(self, result: Dict) -> str:
