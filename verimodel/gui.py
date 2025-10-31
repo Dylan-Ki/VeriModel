@@ -1,7 +1,10 @@
+
 import sys
+import shutil
 from pathlib import Path
 from verimodel.static_scanner import StaticScanner
 from verimodel.dynamic_scanner import DynamicScanner
+from verimodel.virtual_scan_dir import create_virtual_scan_dir
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -55,13 +58,24 @@ class VeriModelGUI:
         if not file_path.exists():
             messagebox.showerror("Lỗi", f"File không tồn tại: {file_path}")
             return
+
+        # Tạo thư mục ảo và copy file vào đó
+        scan_dir, cleanup = create_virtual_scan_dir()
+        temp_file = scan_dir / file_path.name
+        try:
+            shutil.copy2(file_path, temp_file)
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Không thể copy file vào thư mục tạm: {e}")
+            cleanup()
+            return
+
         self.output.config(state=tk.NORMAL)
         self.output.delete(1.0, tk.END)
         results = {}
         if self.static_var.get():
             self.output.insert(tk.END, "[Quét tĩnh]\n")
             static_scanner = StaticScanner()
-            static_result = static_scanner.scan_file(file_path)
+            static_result = static_scanner.scan_file(temp_file)
             results["static"] = static_result
             self.output.insert(tk.END, self.format_static(static_result) + "\n\n")
         if self.dynamic_var.get():
@@ -70,11 +84,12 @@ class VeriModelGUI:
             if not dynamic_scanner.is_supported():
                 self.output.insert(tk.END, "⚠️  Quét động chỉ hỗ trợ trên Linux.\n")
             else:
-                dynamic_result = dynamic_scanner.scan(str(file_path))
+                dynamic_result = dynamic_scanner.scan(str(temp_file))
                 results["dynamic"] = dynamic_result
                 self.output.insert(tk.END, self.format_dynamic(dynamic_result) + "\n\n")
         self.output.insert(tk.END, self.final_verdict(results))
         self.output.config(state=tk.DISABLED)
+        cleanup()
 
     def format_static(self, result):
         if result.get("error"):
