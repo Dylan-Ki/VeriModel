@@ -13,12 +13,20 @@
   ```bash
   python -m verimodel.gui
   ```
-- Giao diện sẽ cho phép bạn:
-  - Chọn file pickle để quét bằng cửa sổ chọn file
-  - Chọn chế độ quét tĩnh, quét động hoặc cả hai
-  - Nhấn "Quét ngay" để thực hiện quét
-- File sẽ được tự động copy vào thư mục tạm trước khi quét để đảm bảo an toàn dữ liệu gốc
-- Kết quả hiển thị trực quan, rõ ràng trên cửa sổ với các phần: Quét tĩnh, Quét động, Kết luận tổng thể
+- Giao diện có 2 tab chính:
+  1. **Tab Quét an toàn**:
+     - Chọn file pickle để quét
+     - Chọn chế độ quét tĩnh, quét động hoặc cả hai
+     - Nhấn "Quét ngay" để thực hiện quét
+  2. **Tab Phân tích chi tiết**:
+     - Chọn file pickle để phân tích
+     - Xem thông tin chi tiết về cấu trúc file:
+       - Thông tin cơ bản (kích thước, định dạng)
+       - Loại dữ liệu và protocol pickle
+       - Phân tích opcodes và byte sequences
+       - Kiểm tra dấu hiệu mã thực thi
+- File sẽ được tự động copy vào thư mục tạm trước khi quét và phân tích để đảm bảo an toàn dữ liệu gốc
+- Kết quả hiển thị trực quan, rõ ràng trên cửa sổ với các phần riêng biệt
 
 ## 3. Sử dụng dòng lệnh (CLI)
 - Quét file pickle:
