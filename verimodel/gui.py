@@ -305,7 +305,7 @@ class VeriModelGUI:
         
         output = []
         scan_label = "tĩnh" if scan_type == "static" else "động"
-        output.append(f"Kết quả quét {scan_label}:")
+        self.scan_output.insert(tk.END, f"Kết quả quét {scan_label}:\n", "header")
         
         # Lấy threats và warnings từ đối tượng kết quả
         threats = []
@@ -321,7 +321,7 @@ class VeriModelGUI:
             warnings = getattr(results, 'warnings', []) if hasattr(results, 'warnings') else []
         
         if threats:
-            output.append(f"Phát hiện {len(threats)} mối nguy:")
+            self.scan_output.insert(tk.END, f"\nPhát hiện {len(threats)} mối nguy:\n", "danger")
             for i, threat in enumerate(threats, 1):
                 # Nếu threat là dict
                 if isinstance(threat, dict):
@@ -331,9 +331,10 @@ class VeriModelGUI:
                 else:
                     severity = getattr(threat, 'severity', 'WARNING')
                     desc = getattr(threat, 'description', str(threat))
-                output.append(f"  {i}. [{severity.upper()}] {desc}")
+                tag = "danger" if severity.upper() == "CRITICAL" else "warning"
+                self.scan_output.insert(tk.END, f"  {i}. [{severity.upper()}] {desc}\n", tag)
         else:
-            output.append("✅ Không phát hiện mối nguy")
+            self.scan_output.insert(tk.END, "✅ Không phát hiện mối nguy\n", "safe")
             
         if warnings:
             output.append(f"\nCảnh báo ({len(warnings)}):")
@@ -420,24 +421,37 @@ class VeriModelGUI:
             
             warnings.extend([f"{str(w)} (quét {scan_label})" for w in result_warnings])
 
-        output = ["\n=== KẾT LUẬN CUỐI CÙNG ==="]
+        self.scan_output.insert(tk.END, "\n=== KẾT LUẬN CUỐI CÙNG ===\n", "header")
         
         if is_safe:
-            output.append("\n✅ FILE AN TOÀN")
-            output.append("Không phát hiện mã độc hoặc hành vi nguy hiểm.")
+            verdict = "✅ FILE AN TOÀN"
+            verdict_tag = "safe"
+            messagebox.showinfo("Kết quả Quét", "File này AN TOÀN để sử dụng! ✅")
         else:
-            output.append("\n🚨 FILE NGUY HIỂM")
-            output.append("Lý do:")
-            for threat in threats:
-                output.append(f"  • {threat}")
-            output.append("\n⚠️ KHUYẾN CÁO: KHÔNG sử dụng file này trong môi trường production!")
+            verdict = "🚨 FILE NGUY HIỂM"
+            verdict_tag = "danger"
+            messagebox.showwarning(
+                "⚠️ Phát hiện Mã độc",
+                "File này có thể NGUY HIỂM! 🚨\n\n" +
+                "Lý do:\n" + "\n".join(f"• {t}" for t in threats) + "\n\n" +
+                "❌ KHÔNG NÊN sử dụng file này!"
+            )
             
-        if warnings:
-            output.append("\nCảnh báo:")
-            for warning in warnings:
-                output.append(f"  • {warning}")
-                
-        return "\n".join(output)
+        self.scan_output.insert(tk.END, f"\n{verdict}\n", verdict_tag)
+        if is_safe:
+            self.scan_output.insert(tk.END, "Không phát hiện mã độc hoặc hành vi nguy hiểm.\n", "safe")
+        else:
+            self.scan_output.insert(tk.END, "Lý do:\n", "danger")
+            for threat in threats:
+                self.scan_output.insert(tk.END, f"  • {threat}\n", "danger")
+            self.scan_output.insert(tk.END, "\n⚠️ KHUYẾN CÁO: KHÔNG sử dụng file này trong môi trường production!\n", "warning")
+            
+            if warnings:
+                self.scan_output.insert(tk.END, "\nCảnh báo:\n", "warning")
+                for warning in warnings:
+                    self.scan_output.insert(tk.END, f"  • {warning}\n", "warning")
+                    
+        return None
 
 if __name__ == "__main__":
     root = tk.Tk()
