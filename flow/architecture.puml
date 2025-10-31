@@ -1,0 +1,63 @@
+@startuml
+' VeriModel architecture component diagram + sequence diagram
+' Component view
+
+title VeriModel - Architecture Overview
+
+package "VeriModel App" {
+  [GUI] as gui
+  [FileAnalyzer] as analyzer
+  [StaticScanner] as static
+  [DynamicScanner] as dynamic
+  [VirtualScanDir] as vdir
+  [Reporter] as reporter
+}
+
+cloud "User Environment" {
+  [User]
+}
+
+database "Demo Models" as demo
+
+User --> gui : select file
+gui --> vdir : copy file to sandbox
+gui --> static : run static scan
+static --> gui : static results
+
+gui --> dynamic : run dynamic scan (optional)
+dynamic --> gui : dynamic results
+
+gui --> analyzer : analyze file
+analyzer --> gui : analysis results
+
+gui --> reporter : export reports (JSON/HTML)
+reporter --> User : deliver report
+
+demo --> gui : provides demo files
+
+' Sequence diagram of a scan
+
+== Sequence: full scan ==
+
+participant U as "User"
+participant G as "GUI"
+participant V as "VirtualScanDir"
+participant S as "StaticScanner"
+participant D as "DynamicScanner"
+participant A as "FileAnalyzer"
+participant R as "Reporter"
+
+U -> G : choose file
+G -> V : copy file to sandbox
+G -> S : scan_file(path)
+S -> G : {threats, warnings, details}
+opt dynamic selected
+  G -> D : run(path)
+  D -> G : {threats, syscalls}
+end
+G -> A : analyze_file(path)
+A -> G : {structure, byte_analysis}
+G -> R : create report(results)
+R -> U : report (HTML/JSON)
+
+@enduml
