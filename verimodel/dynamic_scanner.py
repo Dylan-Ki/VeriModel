@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 try:
     import docker  # Thư viện mới
-    from docker.errors import ImageNotFound, BuildError, APIError, DockerException  # type: ignore
+    from docker.errors import ImageNotFound, BuildError, APIError, DockerException, ReadTimeout  # type: ignore
 except Exception:
     # Docker SDK not available — allow module to import so static analysis/CI doesn't fail.
     docker = None
@@ -21,6 +21,7 @@ except Exception:
     class BuildError(Exception): pass
     class APIError(Exception): pass
     class DockerException(Exception): pass
+    class ReadTimeout(Exception): pass
 from pathlib import Path
 from typing import Dict, List
 
@@ -34,10 +35,14 @@ class DynamicScanner:
 
     def __init__(self):
         self.platform = platform.system()
-        try:
-            self.docker_client = docker.from_env()
-        except DockerException:
+        # Nếu Docker SDK không thể import, biến `docker` sẽ là None — tránh gọi from_env trên None
+        if docker is None:
             self.docker_client = None
+        else:
+            try:
+                self.docker_client = docker.from_env()
+            except DockerException:
+                self.docker_client = None
 
     def is_supported(self) -> bool:
         """Kiểm tra xem Docker có sẵn và đang chạy không."""
@@ -162,6 +167,9 @@ except Exception as e:
                 f.write(loader_script)
                 loader_path_host = f.name
 
+            if not self.docker_client:
+                raise RuntimeError("Docker client is not available.")
+
             container = self.docker_client.containers.run(
                 SANDBOX_IMAGE_NAME,
                 command=["python", "/tmp/loader_script.py"],
@@ -179,7 +187,7 @@ except Exception as e:
             try:
                 result = container.wait(timeout=timeout)
                 logs = container.logs(stdout=True, stderr=True).decode("utf-8")
-            except (subprocess.TimeoutExpired, docker.errors.ReadTimeout):
+            except (subprocess.TimeoutExpired, ReadTimeout):
                 container.kill()
                 threats.append({
                     "type": "TIMEOUT",

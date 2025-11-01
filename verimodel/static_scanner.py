@@ -1,152 +1,165 @@
 import pickletools
 from pathlib import Path
 from typing import List, Dict, Tuple
+import yara # Thư viện mới
+import zipfile # Để xử lý file .pth
+import io
+
+# Đường dẫn đến file quy tắc YARA
+YARA_RULES_PATH = Path(__file__).parent / "rules" / "pickle.yar"
 
 
 class StaticScanner:
-    """Static analyzer for pickle files using bytecode inspection."""
-    
-    #Danh sách đen các module/hàm nguy hiểm
-    DANGEROUS_IMPORTS = {
-        "os.system",
-        "os.popen",
-        "os.execv",
-        "os.execve",
-        "os.execl",
-        "os.execlp",
-        "os.execlp",
-        "os.spawn",
-        "subprocess.run",
-        "subprocess.Popen",
-        "subprocess.call",
-        "subprocess.check_output",
-        "eval",
-        "exec",
-        "compile",
-        "__builtin__.eval",
-        "__builtin__.exec",
-        "__builtin__.compile",
-        "socket.socket",
-        "urllib.request.urlopen",
-        "urllib.request.Request",
-        "requests.get",
-        "requests.post",
-        "http.client.HTTPConnection",
-        "http.client.HTTPSConnection",
-    }
-    
-    #Các module nghi ngờ ( cảnh báo nhưng chưa chắc đã gay hại )
-    SUSPICIOUS_IMPORTS = {
-        "pickle",
-        "dill",
-        "cloudpickle",
-        "torch.load",
-        "tensorflow.keras.models.load_model",
-    }
+    """
+    Phân tích tĩnh file pickle bằng YARA và pickletools.
+    """
     
     def __init__(self):
         self.findings: list[Dict] = []
-        
-    def scan_file(self, file_path: Path) -> Dict:
-        """Quét tĩnh file pickle
-        Args:
-            file_path (str): Đường dẫn tới file pickle
-        Returns:
-            Dict: Chứa kết quả quét tĩnh (is.safe, threats, warnings, details)
-        """
-        self.findings = []
-        file_path = Path(file_path)
+        try:
+            if not YARA_RULES_PATH.exists():
+                raise FileNotFoundError(f"Không tìm thấy file quy tắc YARA: {YARA_RULES_PATH}")
+            self.yara_rules = yara.compile(filepath=str(YARA_RULES_PATH))
+        except Exception as e:
+            print(f"Lỗi nghiêm trọng: Không thể compile quy tắc YARA: {e}")
+            self.yara_rules = None
 
-        if not file_path.suffix.lower() in [".pkl", ".pickle", ".pth"]:
-            return {
-                "is_safe": False,
-                "error": f"File không đúng định dạng: {file_path}",
-                "threats": [],
-                "warnings": [],
-                "details": [],
-            }
-
+    def _scan_content(self, content: bytes, file_name: str) -> Tuple[List, List, List]:
+        """Quét nội dung file (bytes) bằng YARA và pickletools."""
         threats = []
         warnings = []
         details = []
 
-        try:
-            with open(file_path, "rb") as f:
-                # Phân tích bytecode pickle
-                opcodes = list(pickletools.genops(f))
-
-                for opcode, arg, pos in opcodes:
-                    detail = {
-                        "position": pos,
-                        "opcode": opcode.name,
-                        "arg": str(arg) if arg else None,
+        # 1. Quét bằng YARA
+        if self.yara_rules:
+            try:
+                matches = self.yara_rules.match(data=content)
+                for match in matches:
+                    severity = match.meta.get("severity", "MEDIUM").upper()
+                    threat_entry = {
+                        "type": f"YARA:{match.rule}",
+                        "severity": severity,
+                        "description": match.meta.get("description", "Không có mô tả"),
+                        "file_context": file_name,
                     }
-                    details.append(detail)
+                    if severity in ["HIGH", "CRITICAL"]:
+                        threats.append(threat_entry)
+                    else:
+                        warnings.append(threat_entry)
+            except Exception as e:
+                warnings.append({
+                    "type": "YARA_ERROR",
+                    "severity": "LOW",
+                    "description": f"Lỗi khi quét YARA: {e}",
+                    "file_context": file_name,
+                })
 
-                    module_func = None
-                    if opcode.name == "GLOBAL":
-                        module_func = arg if isinstance(arg, str) else None
-                        # Kiểm tra trong danh sách đen
-                        if module_func and any(dangerous in module_func for dangerous in self.DANGEROUS_IMPORTS):
-                            threats.append(
-                                {
-                                    "type": "DANGEROUS_IMPORT",
-                                    "severity": "HIGH",
-                                    "description": f"Phát hiện import đáng ngờ/nguy hiểm: {module_func}",
-                                    "position": pos,
-                                    "opcode": opcode.name,
-                                    "argument": module_func,
-                                }
-                            )
-                    elif opcode.name == "REDUCE":
-                        # REDUCE có thể thực thi hàm, kiểm tra arg nếu là str
-                        module_func = arg if isinstance(arg, str) else None
-                        if module_func and any(susp in module_func for susp in self.SUSPICIOUS_IMPORTS):
-                            warnings.append(
-                                {
-                                    "type": "SUSPICIOUS_IMPORT",
-                                    "severity": "MEDIUM",
-                                    "description": f"Phát hiện import nghi ngờ: {module_func}",
-                                    "position": pos,
-                                    "opcode": opcode.name,
-                                    "argument": module_func,
-                                }
-                            )
+        # 2. Phân tích Opcodes (vẫn hữu ích để đếm)
+        try:
+            opcodes = list(pickletools.genops(content))
+            details = [
+                {
+                    "position": pos,
+                    "opcode": opcode.name,
+                    "arg": str(arg) if arg else None,
+                }
+                for opcode, arg, pos in opcodes
+            ]
+        except Exception:
+            # File có thể không phải là pickle (ví dụ: file zip .pth)
+            pass 
+            
+        return threats, warnings, details
+
+    def scan_file(self, file_path: Path) -> Dict:
+        """Quét tĩnh file (pickle, pth, hoặc các định dạng khác)."""
+        self.findings = []
+        file_path = Path(file_path)
+        
+        if not self.yara_rules:
+             return {
+                "is_safe": False,
+                "error": "Lỗi cấu hình: Không thể tải quy tắc YARA.",
+                "threats": [], "warnings": [], "details": [],
+            }
+
+        if not file_path.exists():
+            return {
+                "is_safe": False,
+                "error": f"File không tồn tại: {file_path}",
+                "threats": [], "warnings": [], "details": [],
+            }
+
+        all_threats = []
+        all_warnings = []
+        all_details = []
+
+        try:
+            file_suffix = file_path.suffix.lower()
+
+            # Xử lý file .pth (là file ZIP)
+            if file_suffix == ".pth":
+                try:
+                    with zipfile.ZipFile(file_path, 'r') as zf:
+                        for sub_file_name in zf.namelist():
+                            # Chỉ quét các file có khả năng chứa pickle
+                            if sub_file_name.endswith(('.pkl', '/data.pkl', '.pickle')):
+                                content = zf.read(sub_file_name)
+                                threats, warnings, details = self._scan_content(content, f"{file_path.name}/{sub_file_name}")
+                                all_threats.extend(threats)
+                                all_warnings.extend(warnings)
+                                all_details.extend(details)
+                except zipfile.BadZipFile:
+                    # Nếu không phải zip, coi nó là file pickle thường
+                    content = file_path.read_bytes()
+                    threats, warnings, details = self._scan_content(content, file_path.name)
+                    all_threats.extend(threats)
+                    all_warnings.extend(warnings)
+                    all_details.extend(details)
+
+            # Xử lý các file pickle khác
+            elif file_suffix in [".pkl", ".pickle"]:
+                content = file_path.read_bytes()
+                threats, warnings, details = self._scan_content(content, file_path.name)
+                all_threats.extend(threats)
+                all_warnings.extend(warnings)
+                all_details.extend(details)
+            
+            else:
+                # Quét bất kỳ file nào khác (ví dụ: .h5, .bin)
+                content = file_path.read_bytes()
+                threats, warnings, details = self._scan_content(content, file_path.name)
+                all_threats.extend(threats)
+                all_warnings.extend(warnings)
+                all_details.extend(details)
+
 
         except Exception as e:
             return {
                 "is_safe": False,
                 "error": f"Lỗi khi quét file: {str(e)}",
-                "threats": [],
-                "warnings": [],
-                "details": [],
+                "threats": [], "warnings": [], "details": [],
             }
 
         # Kết luận
-        is_safe = len(threats) == 0
+        is_safe = len(all_threats) == 0
 
         return {
             "is_safe": is_safe,
-            "threats": threats,
-            "warnings": warnings,
-            "details": details,
-            "total_threats": len(threats),
+            "threats": all_threats,
+            "warnings": all_warnings,
+            "details": all_details, # Tổng số opcodes
+            "total_opcodes": len(all_details),
+            "total_threats": len(all_threats),
         }
-        
+
     def get_summary(self, result: Dict) -> str:
-        """Tạo tóm tắt kết quả quét tĩnh
-        Args:
-            result (Dict): Kết quả quét tĩnh từ scan_file
-        Returns:
-            str: Tóm tắt kết quả quét
-        """
+        """Tạo tóm tắt kết quả quét tĩnh."""
         if result.get("error"):
             return f"❌ LỖI: {result['error']}"
         
-        
         threats = result.get("threats", [])
         warnings = result.get("warnings", [])
-        
         
         if result["is_safe"]:
             if warnings:
