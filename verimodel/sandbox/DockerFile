@@ -1,0 +1,15 @@
+# Dockerfile tối giản để chạy loader script một cách an toàn
+FROM python:3.10-slim
+
+# Cài đặt các thư viện cần thiết cho việc unpickle
+# (Nếu mô hình của bạn cần numpy/torch, hãy thêm chúng vào đây)
+# RUN pip install numpy torch
+
+# Tạo một user không có quyền root
+RUN useradd --create-home --shell /bin/bash verimodel
+WORKDIR /home/verimodel
+USER verimodel
+
+# Script loader sẽ được chạy từ đây
+COPY loader_script.py .
+CMD ["python", "loader_script.py"]
