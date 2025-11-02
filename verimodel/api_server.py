@@ -1,7 +1,7 @@
 """
-FastAPI Server for VeriModel (Minimal Vercel Version)
+FastAPI Server for VeriModel
 
-Chỉ import những gì cần thiết, tránh crash.
+API server với Web UI để quét và phân tích file model AI.
 """
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form, BackgroundTasks
@@ -46,8 +46,8 @@ CONVERTER_AVAILABLE = False
 # ===== APP INITIALIZATION =====
 app = FastAPI(
     title="VeriModel API",
-    description="AI Supply Chain Firewall (Vercel Minimal)",
-    version="0.2.0-vercel-minimal"
+    description="AI Supply Chain Firewall",
+    version="0.2.0"
 )
 
 # CORS
@@ -124,14 +124,14 @@ async def root():
 async def api_info():
     """API info."""
     return {
-        "service": "VeriModel API (Vercel Minimal)",
-        "version": "0.2.0-vercel-minimal",
+        "service": "VeriModel API",
+        "version": "0.2.0",
         "status": "running",
         "components": {
             "static_scanner": STATIC_SCANNER_AVAILABLE,
             "threat_intel": THREAT_INTEL_AVAILABLE,
-            "dynamic_scanner": False,
-            "converter": False
+            "dynamic_scanner": DYNAMIC_AVAILABLE,
+            "converter": CONVERTER_AVAILABLE
         }
     }
 
@@ -141,11 +141,11 @@ async def health_check():
     """Health check."""
     return {
         "status": "healthy",
-        "platform": "Vercel",
+        "platform": "local",
         "static_scanner": "available" if static_scanner else "unavailable",
         "threat_intelligence": "available" if threat_intel else "unavailable",
-        "dynamic_scanner": "unavailable (Docker not supported)",
-        "safetensors_converter": "unavailable"
+        "dynamic_scanner": "available" if DYNAMIC_AVAILABLE else "unavailable",
+        "safetensors_converter": "available" if CONVERTER_AVAILABLE else "unavailable"
     }
 
 
@@ -166,7 +166,7 @@ async def scan_file(
     
     results = {
         "timestamp": datetime.now().isoformat(),
-        "platform": "Vercel",
+        "platform": "local",
         "static": {},
         "threat_intelligence": {},
         "final_verdict": {}
@@ -275,6 +275,6 @@ async def startup_event():
     print(f"✅ FastAPI: OK")
     print(f"{'✅' if STATIC_SCANNER_AVAILABLE else '❌'} Static Scanner: {'OK' if static_scanner else 'FAILED'}")
     print(f"{'✅' if THREAT_INTEL_AVAILABLE else '❌'} Threat Intel: {'OK' if threat_intel else 'FAILED'}")
-    print(f"❌ Dynamic Scanner: Not available (Vercel)")
-    print(f"❌ Converter: Not available")
+    print(f"{'✅' if DYNAMIC_AVAILABLE else '❌'} Dynamic Scanner: {'OK' if DYNAMIC_AVAILABLE else 'Not available'}")
+    print(f"{'✅' if CONVERTER_AVAILABLE else '❌'} Converter: {'OK' if CONVERTER_AVAILABLE else 'Not available'}")
     print("=" * 50)
