@@ -1,0 +1,26 @@
+[package]
+name = "verimodel"
+version = "0.2.0"
+description = "VeriModel - AI Supply Chain Firewall Desktop App"
+authors = ["VeriModel Team"]
+license = "MIT"
+repository = "https://github.com/Dylan-Ki/verimodel"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+tauri = { version = "1.5", features = [ "shell-open", "dialog-open", "dialog-save" ] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.11", features = ["json", "multipart"] }
+tokio = { version = "1", features = ["full"] }
+
+[features]
+# this feature is used for production builds or when `devPath` points to the filesystem
+# DO NOT REMOVE!!
+custom-protocol = ["tauri/custom-protocol"]
+
