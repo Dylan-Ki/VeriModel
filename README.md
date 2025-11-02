@@ -94,7 +94,37 @@ python -c "import uvicorn, fastapi, jinja2; print('✅ OK')"
 
 ## 📖 Sử dụng
 
-### 🖥️ Web Interface (Khuyến nghị)
+### 🖥️ Desktop Application (Khuyến nghị)
+
+VeriModel có sẵn desktop application được xây dựng với Tauri:
+
+```bash
+# Cài đặt dependencies
+npm install
+pip install -r requirements.txt
+
+# Chạy development mode
+# Terminal 1: Start backend
+python run_api.py
+
+# Terminal 2: Start desktop app
+npm run dev
+```
+
+**Build production:**
+```bash
+npm run build
+```
+
+Desktop app cung cấp:
+- Giao diện cyber hiện đại với dark theme
+- Trải nghiệm native desktop
+- Hiệu suất cao và nhẹ (~5MB)
+- Tự động kết nối với Python backend
+
+Xem [TAURI_SETUP.md](TAURI_SETUP.md) để biết thêm chi tiết.
+
+### 🌐 Web Interface
 
 ```bash
 # Chạy server
@@ -108,7 +138,7 @@ Web interface cung cấp:
 - Upload và quét file trực tiếp
 - Chuyển đổi sang safetensors
 - Tra cứu Threat Intelligence
-- Giao diện hiện đại với Bootstrap 5
+- Giao diện hiện đại với cyber theme
 
 ### 💻 Command Line Interface
 
@@ -321,6 +351,8 @@ Dự án này được phân phối dưới giấy phép MIT. Xem file `LICENSE`
 ## 📚 Tài liệu tham khảo
 
 - [README_WEB.md](README_WEB.md) - Hướng dẫn chi tiết về Web Interface
+- [TAURI_SETUP.md](TAURI_SETUP.md) - Hướng dẫn setup Desktop Application với Tauri
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Hướng dẫn deploy lên các nền tảng
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Xử lý các lỗi thường gặp
 - [BUGFIXES.md](BUGFIXES.md) - Log các bug fixes và improvements
 
