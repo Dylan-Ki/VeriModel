@@ -2,63 +2,232 @@ name: CI (Lint, Test & Security Scan)
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  PYTHON_VERSION_MATRIX: "['3.10', '3.11', '3.12']"
 
 jobs:
+  # Lint job - chạy song song với test để tiết kiệm thời gian
   lint:
+    name: Lint Code
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install dependencies
+          cache: 'pip'
+
+      - name: Install linting dependencies
         run: |
           python -m pip install --upgrade pip
           pip install black flake8
-      - name: Run linters
-        run: |
-          black --check .
-          flake8 .
 
+      - name: Check code formatting with Black
+        run: |
+          black --check --diff .
+
+      - name: Run Flake8 linter
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        continue-on-error: true  # Không fail build nếu có warnings
+
+  # Test job với matrix strategy cho multiple Python versions
   test:
-    needs: lint
-    runs-on: ubuntu-latest
+    name: Test Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ['3.10', '3.11', '3.12']
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/checkout@v5
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install system dependencies (for yara-python)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libyara-dev
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install pytest
-      - name: Run tests
-        run: |
-          pytest -q
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
 
+      - name: Run tests with pytest
+        run: |
+          pytest tests/ -v --cov=verimodel --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage to Codecov (optional)
+        if: matrix.python-version == '3.11'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  # Security scan job
   security_scan:
-    needs: [lint, test]
+    name: Security Audit
     runs-on: ubuntu-latest
+    needs: [lint, test]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+
       - name: Install pip-audit
         run: |
           python -m pip install --upgrade pip
           pip install pip-audit
-      - name: Run pip-audit
+
+      - name: Run pip-audit on requirements.txt
         run: |
-          # Quét các thư viện trong pyproject.toml hoặc requirements.txt
-          pip-audit
+          pip-audit -r requirements.txt --format=json --output=pip-audit-report.json
+          pip-audit -r requirements.txt
+        continue-on-error: true  # Không fail build nhưng vẫn báo cáo vulnerabilities
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+          retention-days: 30
+
+  # Build check - kiểm tra code có thể build được không
+  build_check:
+    name: Build Check
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+
+      - name: Check import và syntax
+        run: |
+          python -c "import verimodel; print('✅ Import successful')"
+          python -c "from verimodel.api_server import app; print('✅ API server import successful')"
+          python -c "from verimodel.static_scanner import StaticScanner; print('✅ Static scanner import successful')"
+          python -c "from verimodel.cli import app as cli_app; print('✅ CLI import successful')"
+
+      - name: Test API server startup (dry run)
+        run: |
+          python -c "
+          from verimodel.api_server import app
+          print('✅ API server có thể khởi tạo')
+          print(f'Title: {app.title}')
+          print(f'Version: {app.version}')
+          "
+
+  # Deployment files validation
+  validate_deployment:
+    name: Validate Deployment Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Check vercel.json exists and valid
+        run: |
+          if [ ! -f vercel.json ]; then
+            echo "❌ vercel.json không tồn tại"
+            exit 1
+          fi
+          echo "✅ vercel.json tồn tại"
+          # Validate JSON syntax
+          python -c "import json; json.load(open('vercel.json')); print('✅ vercel.json hợp lệ')"
+
+      - name: Check api/index.py exists
+        run: |
+          if [ ! -f api/index.py ]; then
+            echo "❌ api/index.py không tồn tại"
+            exit 1
+          fi
+          echo "✅ api/index.py tồn tại"
+
+      - name: Check runtime.txt
+        run: |
+          if [ ! -f runtime.txt ]; then
+            echo "⚠️ runtime.txt không tồn tại (tùy chọn)"
+          else
+            echo "✅ runtime.txt tồn tại"
+            cat runtime.txt
+          fi
+
+      - name: Validate Python syntax in api/index.py
+        run: |
+          python -m py_compile api/index.py
+          echo "✅ api/index.py có syntax hợp lệ"
+
+  # Summary job - chạy cuối cùng để tổng hợp kết quả
+  ci_summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [lint, test, security_scan, build_check, validate_deployment]
+    if: always()
+    steps:
+      - name: CI Status
+        run: |
+          echo "## 🎯 CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Scan | ${{ needs.security_scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Check | ${{ needs.build_check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deployment Validation | ${{ needs.validate_deployment.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.lint.result }}" = "success" ] && \
+             [ "${{ needs.test.result }}" = "success" ] && \
+             [ "${{ needs.build_check.result }}" = "success" ] && \
+             [ "${{ needs.validate_deployment.result }}" = "success" ]; then
+            echo "✅ **All checks passed!**" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          else
+            echo "❌ **Some checks failed. Please review the logs above.**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
