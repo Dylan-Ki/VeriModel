@@ -25,17 +25,28 @@ Khi bạn tải một file pickle từ nguồn không tin cậy bằng `pickle.l
 
 ## 💡 Giải pháp
 
-**VeriModel** cung cấp **hai lớp phân tích bảo mật**:
+**VeriModel** cung cấp **nhiều lớp phân tích bảo mật**:
 
 ### 1️⃣ Static Analysis (Quét Tĩnh)
 - Phân tích bytecode pickle **mà không thực thi**
 - Phát hiện các opcode và import nguy hiểm (ví dụ: `os.system`, `subprocess.run`)
+- Sử dụng YARA rules để phát hiện patterns độc hại
 - An toàn 100% - không có rủi ro thực thi mã
 
-### 2️⃣ Dynamic Analysis (Quét Động) - _Chỉ Linux_
-- Thực thi mô hình trong môi trường **sandbox được giám sát**
-- Sử dụng `strace` để theo dõi system calls
+### 2️⃣ Dynamic Analysis (Quét Động)
+- Thực thi mô hình trong **Docker sandbox** được cách ly hoàn toàn
 - Phát hiện hành vi thực tế: kết nối mạng, thực thi lệnh, ghi file
+- Hỗ trợ trên tất cả hệ điều hành có Docker
+
+### 3️⃣ Threat Intelligence
+- Tự động trích xuất IOCs (hashes, IPs, domains) từ file
+- Tra cứu VirusTotal API để phát hiện các indicator đã biết
+- Hỗ trợ tra cứu hash, IP address, và domain
+
+### 4️⃣ Safetensors Converter
+- Chuyển đổi các file model từ pickle sang định dạng safetensors an toàn
+- Hỗ trợ `.pkl`, `.pickle`, và `.pth` files
+- Bảo vệ bạn khỏi các cuộc tấn công RCE trong tương lai
 
 ---
 
@@ -44,73 +55,110 @@ Khi bạn tải một file pickle từ nguồn không tin cậy bằng `pickle.l
 ### Yêu cầu
 
 - Python 3.10 trở lên
-- Linux (cho quét động - tùy chọn)
-- `strace` (cho quét động trên Linux)
+- Docker (cho quét động - tùy chọn)
+- VirusTotal API Key (cho Threat Intelligence - tùy chọn)
 
-### Cài đặt từ source
+### Cài đặt nhanh
 
 ```bash
-# Clone repository
-git clone https://github.com/yourusername/verimodel.git
-cd verimodel
-
-# Cài đặt Poetry (nếu chưa có)
-curl -sSL https://install.python-poetry.org | python3 -
-
 # Cài đặt dependencies
-poetry install
+pip install -r requirements.txt
 
-# Kích hoạt virtual environment
-poetry shell
+# Hoặc sử dụng script tự động
+python install_dependencies.py
 ```
 
-### Cài đặt strace (cho Linux)
+### Cài đặt từng phần (nếu gặp lỗi)
 
 ```bash
-# Ubuntu/Debian
-sudo apt-get install strace
+# Core dependencies (bắt buộc)
+pip install fastapi uvicorn jinja2 python-multipart
 
-# Fedora/RHEL
-sudo dnf install strace
+# CLI dependencies
+pip install rich typer
 
-# Arch Linux
-sudo pacman -S strace
+# Scanner dependencies
+pip install yara-python docker requests
+
+# Safetensors converter (tùy chọn)
+pip install safetensors torch
+```
+
+### Kiểm tra cài đặt
+
+```bash
+python -c "import uvicorn, fastapi, jinja2; print('✅ OK')"
 ```
 
 ---
 
 ## 📖 Sử dụng
 
-### Quét một file pickle
+### 🖥️ Web Interface (Khuyến nghị)
+
+```bash
+# Chạy server
+python run_api.py
+
+# Mở trình duyệt: http://localhost:8000
+# ⚠️ KHÔNG dùng http://0.0.0.0:8000 trong trình duyệt!
+```
+
+Web interface cung cấp:
+- Upload và quét file trực tiếp
+- Chuyển đổi sang safetensors
+- Tra cứu Threat Intelligence
+- Giao diện hiện đại với Bootstrap 5
+
+### 💻 Command Line Interface
 
 ```bash
 # Quét đầy đủ (static + dynamic)
 verimodel scan model.pkl
 
-# Chỉ quét tĩnh (nhanh hơn, an toàn hơn)
+# Chỉ quét tĩnh (nhanh hơn)
 verimodel scan model.pkl --static-only
 
-# Chỉ quét động (Linux only)
+# Chỉ quét động
 verimodel scan model.pkl --dynamic-only
+
+# Với Threat Intelligence
+verimodel scan model.pkl --threat-intel
 
 # Quét với chi tiết đầy đủ
 verimodel scan model.pkl --verbose
 
-# Quét với timeout tùy chỉnh
-verimodel scan model.pkl --timeout 10
-```
+# Chuyển đổi sang safetensors
+verimodel convert model.pkl
 
-### Xem thông tin file
+# Tra cứu Threat Intelligence
+verimodel threat-intel --hash <hash> --ip <ip> --domain <domain>
 
-```bash
+# Xem thông tin file
 verimodel info model.pkl
 ```
 
-### Hiển thị phiên bản
+### 🌐 API Endpoints
+
+Nếu muốn tích hợp vào ứng dụng của bạn:
 
 ```bash
-verimodel --version
+# Health check
+curl http://localhost:8000/api/v1/health
+
+# Scan file
+curl -X POST -F "file=@model.pkl" http://localhost:8000/api/v1/scan
+
+# Convert to safetensors
+curl -X POST -F "file=@model.pkl" http://localhost:8000/api/v1/convert -o output.safetensors
+
+# Threat Intelligence
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"hash":"abc123..."}' \
+  http://localhost:8000/api/v1/threat-intel
 ```
+
+Xem tài liệu API đầy đủ tại: http://localhost:8000/docs (Swagger UI)
 
 ---
 
@@ -172,23 +220,35 @@ Không phát hiện mã độc hại hoặc hành vi nguy hiểm.
 ```
 verimodel/
 ├── verimodel/
-│   ├── __init__.py           # Package initialization
-│   ├── cli.py                # CLI interface (Typer + Rich)
-│   ├── static_scanner.py     # Static bytecode analysis
-│   └── dynamic_scanner.py    # Dynamic sandbox execution
-├── demo_models/              # Demo pickle files
-├── generate_malicious_models.py  # Demo file generator
-├── pyproject.toml            # Poetry configuration
-└── README.md                 # This file
+│   ├── __init__.py                # Package initialization
+│   ├── cli.py                     # CLI interface (Typer + Rich)
+│   ├── api_server.py              # FastAPI server với Web UI
+│   ├── static_scanner.py          # Static bytecode analysis với YARA
+│   ├── dynamic_scanner.py         # Dynamic Docker sandbox execution
+│   ├── threat_intelligence.py     # VirusTotal integration
+│   ├── safetensors_converter.py   # Safe model conversion
+│   └── rules/
+│       └── pickle.yar             # YARA rules
+├── web_templates/
+│   └── index.html                 # Web UI template
+├── static/
+│   └── app.js                     # Frontend JavaScript
+├── demo_models/                   # Demo pickle files
+├── run_api.py                     # Script chạy server
+├── requirements.txt               # Dependencies
+└── README.md                      # This file
 ```
 
 ### Tech Stack
 
 - **Python 3.10+**: Core language
-- **Typer + Rich**: Professional CLI with beautiful output
-- **Poetry**: Modern dependency management
-- **pickletools**: Safe pickle bytecode analysis
-- **strace**: System call monitoring (Linux)
+- **FastAPI + Uvicorn**: Modern web framework và ASGI server
+- **Jinja2**: Template engine cho Web UI
+- **Typer + Rich**: Professional CLI với output đẹp
+- **YARA**: Pattern matching cho static analysis
+- **Docker**: Sandbox cho dynamic analysis
+- **VirusTotal API**: Threat Intelligence
+- **Safetensors**: Safe model format
 
 ---
 
@@ -222,7 +282,9 @@ verimodel/
 
 ## ⚠️ Giới hạn
 
-- **Quét động chỉ hỗ trợ Linux**: Windows/macOS không hỗ trợ strace
+- **Quét động yêu cầu Docker**: Cần Docker đang chạy để sử dụng dynamic scanning
+- **Threat Intelligence yêu cầu API key**: VirusTotal API key cần thiết (miễn phí từ virustotal.com)
+- **Safetensors converter yêu cầu PyTorch**: Cần cài đặt torch và safetensors
 - **Không phân tích .safetensors**: Định dạng này đã an toàn từ thiết kế
 - **Không hỗ trợ .h5, .onnx**: Chỉ tập trung vào pickle
 - **False positives có thể xảy ra**: Một số model hợp lệ có thể trigger cảnh báo
@@ -257,6 +319,12 @@ Dự án này được phân phối dưới giấy phép MIT. Xem file `LICENSE`
 ---
 
 ## 📚 Tài liệu tham khảo
+
+- [README_WEB.md](README_WEB.md) - Hướng dẫn chi tiết về Web Interface
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Xử lý các lỗi thường gặp
+- [BUGFIXES.md](BUGFIXES.md) - Log các bug fixes và improvements
+
+### Liên kết ngoài
 
 - [Python Pickle Documentation](https://docs.python.org/3/library/pickle.html)
 - [Exploiting Python Pickles](https://davidhamann.de/2020/04/05/exploiting-python-pickle/)
