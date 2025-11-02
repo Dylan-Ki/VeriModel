@@ -1,280 +1,210 @@
 """
-FastAPI Server for VeriModel (Minimal Vercel Version)
+Static Scanner Module (Vercel-compatible)
 
-Chỉ import những gì cần thiết, tránh crash.
+Đảm bảo YARA rules được load đúng trên Vercel serverless environment.
 """
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form, BackgroundTasks
-from fastapi.responses import JSONResponse, HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
+import pickletools
 from pathlib import Path
-import tempfile
-import shutil
+from typing import List, Dict, Tuple
+import yara
+import zipfile
+import io
 import os
-from datetime import datetime
 
-# ===== SAFE IMPORTS =====
-# Import từng module một, catch errors
-try:
-    from jinja2 import Environment, FileSystemLoader
-    JINJA_AVAILABLE = True
-except Exception as e:
-    print(f"⚠️ Jinja2 import failed: {e}")
-    JINJA_AVAILABLE = False
-
-try:
-    from verimodel.static_scanner import StaticScanner
-    STATIC_SCANNER_AVAILABLE = True
-except Exception as e:
-    print(f"⚠️ StaticScanner import failed: {e}")
-    STATIC_SCANNER_AVAILABLE = False
-    StaticScanner = None
-
-try:
-    from verimodel.threat_intelligence import ThreatIntelligence
-    THREAT_INTEL_AVAILABLE = True
-except Exception as e:
-    print(f"⚠️ ThreatIntelligence import failed: {e}")
-    THREAT_INTEL_AVAILABLE = False
-    ThreatIntelligence = None
-
-# Dynamic scanner and converter are optional
-DYNAMIC_AVAILABLE = False
-CONVERTER_AVAILABLE = False
-
-# ===== APP INITIALIZATION =====
-app = FastAPI(
-    title="VeriModel API",
-    description="AI Supply Chain Firewall (Vercel Minimal)",
-    version="0.2.0-vercel-minimal"
-)
-
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ===== SETUP TEMPLATES & STATIC =====
-templates_dir = Path(__file__).parent.parent / "web_templates"
-static_dir = Path(__file__).parent.parent / "static"
-
-if JINJA_AVAILABLE and templates_dir.exists():
-    jinja_env = Environment(loader=FileSystemLoader(str(templates_dir)))
-else:
-    jinja_env = None
-    print("⚠️ Templates not available")
-
-if static_dir.exists():
+# Tìm đường dẫn YARA rules (hỗ trợ cả local và Vercel)
+def find_yara_rules_path():
+    """Tìm đường dẫn đến YARA rules file."""
+    # Thử các đường dẫn có thể có
+    possible_paths = [
+        Path(__file__).parent / "rules" / "pickle.yar",  # Local development
+        Path("/var/task/verimodel/rules/pickle.yar"),    # Vercel serverless
+        Path(os.getcwd()) / "verimodel" / "rules" / "pickle.yar",  # Alternative
+        Path("/var/task") / "verimodel" / "rules" / "pickle.yar",  # Vercel absolute
+    ]
+    
+    for path in possible_paths:
+        if path.exists():
+            print(f"✅ Found YARA rules at: {path}")
+            return path
+    
+    # Nếu không tìm thấy, trả về None thay vì raise error
+    print(f"⚠️ YARA rules không tìm thấy. Đã thử:")
+    for p in possible_paths:
+        print(f"  - {p} (exists: {p.exists()})")
+    print(f"Current directory: {os.getcwd()}")
+    print(f"__file__ location: {Path(__file__).parent}")
+    
+    # List files để debug
     try:
-        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+        task_dir = Path("/var/task")
+        if task_dir.exists():
+            print(f"Files in /var/task:")
+            for item in task_dir.rglob("*.yar"):
+                print(f"  - {item}")
     except Exception as e:
-        print(f"⚠️ Static files mount failed: {e}")
-
-# ===== INITIALIZE SCANNERS =====
-static_scanner = None
-threat_intel = None
-
-if STATIC_SCANNER_AVAILABLE:
-    try:
-        static_scanner = StaticScanner()
-        print("✅ Static scanner initialized")
-    except Exception as e:
-        print(f"❌ Static scanner init failed: {e}")
-
-if THREAT_INTEL_AVAILABLE:
-    try:
-        threat_intel = ThreatIntelligence()
-        print("✅ Threat intel initialized")
-    except Exception as e:
-        print(f"❌ Threat intel init failed: {e}")
+        print(f"Cannot list /var/task: {e}")
+    
+    return None  # Trả về None thay vì raise error
 
 
-# ===== ROUTES =====
-
-@app.get("/")
-async def root():
-    """Root endpoint."""
-    if jinja_env:
+class StaticScanner:
+    """Phân tích tĩnh file pickle bằng YARA và pickletools."""
+    
+    def __init__(self):
+        self.findings: list[Dict] = []
         try:
-            template = jinja_env.get_template("index.html")
-            return HTMLResponse(content=template.render())
+            yara_rules_path = find_yara_rules_path()
+            self.yara_rules = yara.compile(filepath=str(yara_rules_path))
+            print(f"✅ YARA rules loaded from: {yara_rules_path}")
+        except FileNotFoundError as e:
+            print(f"❌ YARA rules không tìm thấy: {e}")
+            self.yara_rules = None
         except Exception as e:
-            return HTMLResponse(f"""
-            <html><body>
-            <h1>🛡️ VeriModel API</h1>
-            <p>Template error: {e}</p>
-            <p><a href="/docs">API Documentation</a></p>
-            </body></html>
-            """)
-    else:
-        return HTMLResponse("""
-        <html><body>
-        <h1>🛡️ VeriModel API</h1>
-        <p>Web UI not available. Use <a href="/docs">API Documentation</a></p>
-        </body></html>
-        """)
+            print(f"❌ Lỗi khi compile YARA rules: {e}")
+            self.yara_rules = None
 
+    def _scan_content(self, content: bytes, file_name: str) -> Tuple[List, List, List]:
+        """Quét nội dung file (bytes) bằng YARA và pickletools."""
+        threats = []
+        warnings = []
+        details = []
 
-@app.get("/api")
-async def api_info():
-    """API info."""
-    return {
-        "service": "VeriModel API (Vercel Minimal)",
-        "version": "0.2.0-vercel-minimal",
-        "status": "running",
-        "components": {
-            "static_scanner": STATIC_SCANNER_AVAILABLE,
-            "threat_intel": THREAT_INTEL_AVAILABLE,
-            "dynamic_scanner": False,
-            "converter": False
-        }
-    }
+        # 1. Quét bằng YARA
+        if self.yara_rules:
+            try:
+                matches = self.yara_rules.match(data=content)
+                for match in matches:
+                    severity = match.meta.get("severity", "MEDIUM").upper()
+                    threat_entry = {
+                        "type": f"YARA:{match.rule}",
+                        "severity": severity,
+                        "description": match.meta.get("description", "Không có mô tả"),
+                        "file_context": file_name,
+                    }
+                    if severity in ["HIGH", "CRITICAL"]:
+                        threats.append(threat_entry)
+                    else:
+                        warnings.append(threat_entry)
+            except Exception as e:
+                warnings.append({
+                    "type": "YARA_ERROR",
+                    "severity": "LOW",
+                    "description": f"Lỗi khi quét YARA: {e}",
+                    "file_context": file_name,
+                })
+        else:
+            warnings.append({
+                "type": "YARA_UNAVAILABLE",
+                "severity": "LOW",
+                "description": "YARA rules không khả dụng. Chỉ quét bằng pickletools.",
+                "file_context": file_name,
+            })
 
+        # 2. Phân tích Opcodes
+        try:
+            opcodes = list(pickletools.genops(io.BytesIO(content)))
+            details = [
+                {
+                    "position": pos,
+                    "opcode": opcode.name,
+                    "arg": str(arg) if arg else None,
+                }
+                for opcode, arg, pos in opcodes
+            ]
+        except Exception:
+            pass 
+            
+        return threats, warnings, details
 
-@app.get("/api/v1/health")
-async def health_check():
-    """Health check."""
-    return {
-        "status": "healthy",
-        "platform": "Vercel",
-        "static_scanner": "available" if static_scanner else "unavailable",
-        "threat_intelligence": "available" if threat_intel else "unavailable",
-        "dynamic_scanner": "unavailable (Docker not supported)",
-        "safetensors_converter": "unavailable"
-    }
+    def scan_file(self, file_path: Path) -> Dict:
+        """Quét tĩnh file (pickle, pth, hoặc các định dạng khác)."""
+        self.findings = []
+        file_path = Path(file_path)
+        
+        if not file_path.exists():
+            return {
+                "is_safe": False,
+                "error": f"File không tồn tại: {file_path}",
+                "threats": [], "warnings": [], "details": [],
+            }
 
+        all_threats = []
+        all_warnings = []
+        all_details = []
 
-@app.post("/api/v1/scan")
-async def scan_file(
-    background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
-    static_only: bool = Form(False),
-    include_threat_intel: bool = Form(True),
-):
-    """Scan file for malicious code."""
-    
-    if not static_scanner:
-        raise HTTPException(
-            status_code=503,
-            detail="Static scanner not available. Check deployment logs."
-        )
-    
-    results = {
-        "timestamp": datetime.now().isoformat(),
-        "platform": "Vercel",
-        "static": {},
-        "threat_intelligence": {},
-        "final_verdict": {}
-    }
+        try:
+            file_suffix = file_path.suffix.lower()
 
-    temp_file_path = None
+            # Xử lý file .pth (là file ZIP)
+            if file_suffix == ".pth":
+                try:
+                    with zipfile.ZipFile(file_path, 'r') as zf:
+                        for sub_file_name in zf.namelist():
+                            if sub_file_name.endswith(('.pkl', '/data.pkl', '.pickle')):
+                                content = zf.read(sub_file_name)
+                                threats, warnings, details = self._scan_content(
+                                    content, 
+                                    f"{file_path.name}/{sub_file_name}"
+                                )
+                                all_threats.extend(threats)
+                                all_warnings.extend(warnings)
+                                all_details.extend(details)
+                except zipfile.BadZipFile:
+                    # Nếu không phải zip, coi nó là file pickle thường
+                    content = file_path.read_bytes()
+                    threats, warnings, details = self._scan_content(content, file_path.name)
+                    all_threats.extend(threats)
+                    all_warnings.extend(warnings)
+                    all_details.extend(details)
 
-    try:
-        # Save uploaded file
-        suffix = Path(file.filename).suffix if file.filename else ".pkl"
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-        temp_file_path = temp_file.name
-        shutil.copyfileobj(file.file, temp_file)
-        temp_file.close()
-        file_path = Path(temp_file_path)
+            # Xử lý các file pickle khác
+            elif file_suffix in [".pkl", ".pickle"]:
+                content = file_path.read_bytes()
+                threats, warnings, details = self._scan_content(content, file_path.name)
+                all_threats.extend(threats)
+                all_warnings.extend(warnings)
+                all_details.extend(details)
+            
+            else:
+                # Quét bất kỳ file nào khác
+                content = file_path.read_bytes()
+                threats, warnings, details = self._scan_content(content, file_path.name)
+                all_threats.extend(threats)
+                all_warnings.extend(warnings)
+                all_details.extend(details)
 
-        # Static scan
-        static_result = static_scanner.scan_file(file_path)
-        results["static"] = static_result
+        except Exception as e:
+            return {
+                "is_safe": False,
+                "error": f"Lỗi khi quét file: {str(e)}",
+                "threats": [], "warnings": [], "details": [],
+            }
 
-        # Threat Intelligence
-        if include_threat_intel and threat_intel:
-            ti_result = threat_intel.analyze_file(file_path, check_vt=True)
-            results["threat_intelligence"] = ti_result
+        # Kết luận
+        is_safe = len(all_threats) == 0
 
-        # Final verdict
-        is_safe = True
-        reasons = []
-
-        if results["static"] and not results["static"].get("error"):
-            if not results["static"].get("is_safe", True):
-                is_safe = False
-                threats_count = len(results["static"].get("threats", []))
-                reasons.append(f"Static scan: {threats_count} threats detected")
-
-        if results.get("threat_intelligence", {}).get("threats"):
-            is_safe = False
-            ti_count = len(results["threat_intelligence"]["threats"])
-            reasons.append(f"Threat Intelligence: {ti_count} threats detected")
-
-        results["final_verdict"] = {
+        return {
             "is_safe": is_safe,
-            "verdict": "SAFE" if is_safe else "DANGEROUS",
-            "reasons": reasons
+            "threats": all_threats,
+            "warnings": all_warnings,
+            "details": all_details,
+            "total_opcodes": len(all_details),
+            "total_threats": len(all_threats),
         }
 
-        return JSONResponse(content=results)
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Scan error: {str(e)}"
-        )
-    finally:
-        if temp_file_path and os.path.exists(temp_file_path):
-            background_tasks.add_task(os.unlink, temp_file_path)
-
-
-@app.post("/api/v1/threat-intel")
-async def query_threat_intelligence(
-    hash: str = Form(None),
-    ip: str = Form(None),
-    domain: str = Form(None)
-):
-    """Query threat intelligence."""
-    
-    if not threat_intel:
-        raise HTTPException(
-            status_code=503,
-            detail="Threat Intelligence not available"
-        )
-    
-    results = {}
-
-    try:
-        if hash:
-            results["hash"] = threat_intel.query_virustotal_hash(hash)
-        if ip:
-            results["ip"] = threat_intel.query_virustotal_ip(ip)
-        if domain:
-            results["domain"] = threat_intel.query_virustotal_domain(domain)
-
-        if not results:
-            raise HTTPException(
-                status_code=400,
-                detail="Provide at least one: hash, ip, or domain"
-            )
-
-        return JSONResponse(content=results)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Query error: {str(e)}"
-        )
-
-
-# ===== STARTUP EVENT =====
-@app.on_event("startup")
-async def startup_event():
-    """Log startup info."""
-    print("=" * 50)
-    print("🚀 VeriModel API Starting...")
-    print(f"✅ FastAPI: OK")
-    print(f"{'✅' if STATIC_SCANNER_AVAILABLE else '❌'} Static Scanner: {'OK' if static_scanner else 'FAILED'}")
-    print(f"{'✅' if THREAT_INTEL_AVAILABLE else '❌'} Threat Intel: {'OK' if threat_intel else 'FAILED'}")
-    print(f"❌ Dynamic Scanner: Not available (Vercel)")
-    print(f"❌ Converter: Not available")
-    print("=" * 50)
+    def get_summary(self, result: Dict) -> str:
+        """Tạo tóm tắt kết quả quét tĩnh."""
+        if result.get("error"):
+            return f"❌ LỖI: {result['error']}"
+        
+        threats = result.get("threats", [])
+        warnings = result.get("warnings", [])
+        
+        if result["is_safe"]:
+            if warnings:
+                return f"⚠️  CẢNH BÁO: Tìm thấy {len(warnings)} cảnh báo (không chắc chắn nguy hiểm)"
+            else:
+                return "✅ AN TOÀN: Không phát hiện mã độc hại"
+        else:
+            return f"🚨 NGUY HIỂM: Phát hiện {len(threats)} mối đe dọa"
