@@ -7,97 +7,478 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@400;500;700&display=swap');
+        
         :root {
-            --primary-color: #1f77b4;
-            --success-color: #28a745;
-            --danger-color: #dc3545;
-            --warning-color: #ffc107;
+            --cyber-dark: #0a0e27;
+            --cyber-darker: #050810;
+            --cyber-green: #00ff88;
+            --cyber-cyan: #00d4ff;
+            --cyber-purple: #b347ff;
+            --cyber-pink: #ff006e;
+            --cyber-orange: #ff6b35;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
         }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--cyber-dark);
+            background-image: 
+                linear-gradient(rgba(0, 255, 136, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 136, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            font-family: 'Roboto Mono', monospace;
+            color: #ffffff;
             min-height: 100vh;
             padding: 20px;
+            position: relative;
+            overflow-x: hidden;
         }
+        
+        /* Animated grid overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 255, 136, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 136, 0.05) 1px, transparent 1px);
+            background-size: 100px 100px;
+            animation: gridMove 20s linear infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        @keyframes gridMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(100px, 100px); }
+        }
+        
         .main-container {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            padding: 30px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 0 20px rgba(0, 255, 136, 0.1);
+            padding: 40px;
             margin-top: 20px;
+            position: relative;
+            z-index: 1;
         }
+        
         .header {
             text-align: center;
+            margin-bottom: 40px;
+            position: relative;
+        }
+        
+        .header h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 3rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--cyber-green), var(--cyber-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+        
+        .header .lead {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 1.1rem;
+            font-weight: 400;
+        }
+        
+        /* Navigation Tabs */
+        .nav-tabs {
+            border: none;
             margin-bottom: 30px;
-            color: var(--primary-color);
         }
+        
         .nav-tabs .nav-link {
-            color: var(--primary-color);
+            color: rgba(255, 255, 255, 0.6);
             font-weight: 500;
+            border: 1px solid transparent;
+            border-radius: 10px 10px 0 0;
+            padding: 15px 25px;
+            transition: all 0.3s;
+            background: transparent;
+            margin-right: 5px;
         }
+        
+        .nav-tabs .nav-link:hover {
+            color: var(--cyber-green);
+            border-color: rgba(0, 255, 136, 0.3);
+            background: rgba(0, 255, 136, 0.05);
+        }
+        
         .nav-tabs .nav-link.active {
-            background-color: var(--primary-color);
-            color: white;
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 212, 255, 0.2));
+            border-color: var(--cyber-green);
+            color: var(--cyber-green);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
         }
+        
+        /* Cards */
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 15px;
+            color: #ffffff;
+            margin-bottom: 20px;
+        }
+        
+        .card-header {
+            background: rgba(0, 255, 136, 0.1);
+            border-bottom: 1px solid rgba(0, 255, 136, 0.3);
+            color: var(--cyber-green);
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            padding: 15px 20px;
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        /* Upload Area */
         .upload-area {
-            border: 2px dashed #ccc;
-            border-radius: 10px;
-            padding: 40px;
+            border: 2px dashed rgba(0, 255, 136, 0.4);
+            border-radius: 15px;
+            padding: 60px 40px;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s;
+            background: rgba(0, 255, 136, 0.05);
+            position: relative;
+            overflow: hidden;
         }
+        
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(0, 255, 136, 0.1) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
         .upload-area:hover {
-            border-color: var(--primary-color);
-            background-color: #f8f9fa;
+            border-color: var(--cyber-green);
+            background: rgba(0, 255, 136, 0.1);
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.3);
+            transform: translateY(-2px);
         }
+        
+        .upload-area:hover::before {
+            opacity: 1;
+        }
+        
         .upload-area.dragover {
-            border-color: var(--primary-color);
-            background-color: #e7f3ff;
+            border-color: var(--cyber-green);
+            background: rgba(0, 255, 136, 0.15);
+            box-shadow: 0 0 40px rgba(0, 255, 136, 0.5);
+            transform: scale(1.02);
         }
+        
+        .upload-area i {
+            color: var(--cyber-green);
+            font-size: 4rem;
+            margin-bottom: 20px;
+            display: block;
+            text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        }
+        
+        .upload-area h4 {
+            color: #ffffff;
+            font-family: 'Orbitron', sans-serif;
+            margin-bottom: 10px;
+        }
+        
+        .upload-area p {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        /* Buttons */
+        .btn {
+            border-radius: 8px;
+            padding: 12px 30px;
+            font-weight: 600;
+            transition: all 0.3s;
+            border: none;
+            position: relative;
+            overflow: hidden;
+            font-family: 'Roboto Mono', monospace;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--cyber-green), var(--cyber-cyan));
+            color: var(--cyber-dark);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.6);
+            background: linear-gradient(135deg, var(--cyber-cyan), var(--cyber-green));
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, var(--cyber-green), #00cc6a);
+            color: var(--cyber-dark);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.6);
+        }
+        
+        /* Form Controls */
+        .form-control, .form-select {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            border-radius: 8px;
+            color: #ffffff;
+            padding: 12px 15px;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            background: rgba(0, 0, 0, 0.5);
+            border-color: var(--cyber-green);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+            color: #ffffff;
+        }
+        
+        .form-control::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+        
+        .form-label {
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+        
+        .form-check-input {
+            background-color: rgba(0, 0, 0, 0.3);
+            border-color: rgba(0, 255, 136, 0.3);
+        }
+        
+        .form-check-input:checked {
+            background-color: var(--cyber-green);
+            border-color: var(--cyber-green);
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+        
+        .form-check-label {
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        /* Results */
         .result-card {
             margin-top: 20px;
-            border-radius: 10px;
-            padding: 20px;
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
         }
+        
         .result-safe {
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.2);
         }
+        
         .result-danger {
-            background-color: #f8d7da;
-            border: 1px solid #f5c6cb;
+            background: rgba(255, 0, 110, 0.1);
+            border: 1px solid rgba(255, 0, 110, 0.3);
+            box-shadow: 0 0 30px rgba(255, 0, 110, 0.2);
         }
-        .spinner-border {
-            display: none;
-        }
-        .loading .spinner-border {
-            display: inline-block;
-        }
-        .metric-card {
-            background: #f8f9fa;
-            border-radius: 8px;
+        
+        .threat-item {
             padding: 15px;
             margin: 10px 0;
+            border-left: 4px solid var(--cyber-pink);
+            background: rgba(255, 0, 110, 0.1);
+            border-radius: 5px;
+            color: rgba(255, 255, 255, 0.9);
         }
-        .threat-item {
-            padding: 10px;
-            margin: 5px 0;
-            border-left: 4px solid var(--danger-color);
-            background-color: #fff3cd;
-        }
+        
         .warning-item {
-            padding: 10px;
-            margin: 5px 0;
-            border-left: 4px solid var(--warning-color);
-            background-color: #fff3cd;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid var(--cyber-orange);
+            background: rgba(255, 107, 53, 0.1);
+            border-radius: 5px;
+            color: rgba(255, 255, 255, 0.9);
         }
+        
+        /* Alerts */
+        .alert {
+            border-radius: 10px;
+            border: none;
+            backdrop-filter: blur(10px);
+        }
+        
+        .alert-info {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            color: var(--cyber-cyan);
+        }
+        
+        .alert-success {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            color: var(--cyber-green);
+        }
+        
+        .alert-danger {
+            background: rgba(255, 0, 110, 0.1);
+            border: 1px solid rgba(255, 0, 110, 0.3);
+            color: var(--cyber-pink);
+        }
+        
+        .alert-warning {
+            background: rgba(255, 107, 53, 0.1);
+            border: 1px solid rgba(255, 107, 53, 0.3);
+            color: var(--cyber-orange);
+        }
+        
+        /* Spinner */
+        .spinner-border {
+            color: var(--cyber-green);
+        }
+        
+        /* Tooltip */
         .tooltip-icon {
             cursor: help;
             margin-left: 5px;
             font-size: 0.9em;
+            color: var(--cyber-cyan);
         }
+        
         .tooltip-icon:hover {
-            color: var(--primary-color) !important;
+            color: var(--cyber-green);
+        }
+        
+        /* Range Slider */
+        .form-range::-webkit-slider-thumb {
+            background: var(--cyber-green);
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+        
+        .form-range::-moz-range-thumb {
+            background: var(--cyber-green);
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+        
+        .form-range::-webkit-slider-runnable-track {
+            background: rgba(0, 255, 136, 0.2);
+        }
+        
+        .form-range::-moz-range-track {
+            background: rgba(0, 255, 136, 0.2);
+        }
+        
+        /* Text Colors */
+        .text-success {
+            color: var(--cyber-green) !important;
+        }
+        
+        .text-danger {
+            color: var(--cyber-pink) !important;
+        }
+        
+        .text-warning {
+            color: var(--cyber-orange) !important;
+        }
+        
+        .text-info {
+            color: var(--cyber-cyan) !important;
+        }
+        
+        .text-muted {
+            color: rgba(255, 255, 255, 0.5) !important;
+        }
+        
+        /* Badge */
+        .badge {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+        
+        .badge.bg-secondary {
+            background: rgba(255, 255, 255, 0.2) !important;
+            color: #ffffff;
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 136, 0.5);
+            border-radius: 5px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--cyber-green);
+        }
+        
+        /* Loading Animation */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .loading {
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .main-container {
+                padding: 20px;
+            }
         }
     </style>
 </head>
@@ -168,7 +549,7 @@
                     <!-- Scan Tab -->
                     <div class="tab-pane fade show active" id="scan" role="tabpanel">
                         <div class="upload-area" id="uploadArea">
-                            <i class="bi bi-cloud-upload" style="font-size: 3rem; color: #ccc;"></i>
+                            <i class="bi bi-cloud-upload"></i>
                             <h4>Kéo thả file vào đây hoặc click để chọn</h4>
                             <p class="text-muted">Hỗ trợ: .pkl, .pickle, .pth</p>
                             <input type="file" id="fileInput" accept=".pkl,.pickle,.pth" style="display: none;">
@@ -191,7 +572,7 @@
                     <!-- Convert Tab -->
                     <div class="tab-pane fade" id="convert" role="tabpanel">
                         <div class="upload-area" id="convertUploadArea">
-                            <i class="bi bi-cloud-upload" style="font-size: 3rem; color: #ccc;"></i>
+                            <i class="bi bi-cloud-upload"></i>
                             <h4>Chọn file để chuyển đổi sang Safetensors</h4>
                             <p class="text-muted">⚠️ Chỉ chuyển đổi các file đã được verified an toàn!</p>
                             <input type="file" id="convertFileInput" accept=".pkl,.pickle,.pth" style="display: none;">
@@ -216,7 +597,7 @@
                                 <div class="mb-3">
                                     <label class="form-label">
                                         Hash (MD5, SHA1, SHA256)
-                                        <i class="bi bi-question-circle text-muted" 
+                                        <i class="bi bi-question-circle tooltip-icon" 
                                            data-bs-toggle="tooltip" 
                                            data-bs-placement="right" 
                                            title="Nhập hash MD5 (32 ký tự), SHA1 (40 ký tự), hoặc SHA256 (64 ký tự). Hash được sử dụng để xác định file hoặc indicator độc hại. Ví dụ: 5d41402abc4b2a76b9719d911017c592 (MD5)"></i>
@@ -226,7 +607,7 @@
                                 <div class="mb-3">
                                     <label class="form-label">
                                         IP Address
-                                        <i class="bi bi-question-circle text-muted" 
+                                        <i class="bi bi-question-circle tooltip-icon" 
                                            data-bs-toggle="tooltip" 
                                            data-bs-placement="right" 
                                            title="Nhập địa chỉ IP để kiểm tra xem IP này có liên quan đến các hoạt động độc hại không. VirusTotal sẽ tra cứu lịch sử của IP và các URL độc hại liên quan. Ví dụ: 192.168.1.1"></i>
@@ -236,7 +617,7 @@
                                 <div class="mb-3">
                                     <label class="form-label">
                                         Domain
-                                        <i class="bi bi-question-circle text-muted" 
+                                        <i class="bi bi-question-circle tooltip-icon" 
                                            data-bs-toggle="tooltip" 
                                            data-bs-placement="right" 
                                            title="Nhập tên domain để kiểm tra reputation. VirusTotal sẽ tra cứu các URL độc hại liên quan đến domain này, subdomains, và categories. Ví dụ: example.com"></i>
@@ -262,4 +643,3 @@
     <script src="/static/app.js"></script>
 </body>
 </html>
-
