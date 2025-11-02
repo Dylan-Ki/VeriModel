@@ -41,7 +41,7 @@ class ThreatIntelligence:
         self.vt_base_url = "https://www.virustotal.com/vtapi/v2"
         self.rate_limit_delay = 16  # VirusTotal giới hạn 4 requests/phút (15s/request)
 
-    def extract_iocs_from_content(self, content: bytes, file_path: Optional[Path] = None) -> Dict[str, Set[str]]:
+    def extract_iocs_from_content(self, content: bytes, file_path: Optional[Path] = None) -> Dict[str, List[str]]:
         """
         Trích xuất IOCs (Indicators of Compromise) từ nội dung file.
         
@@ -104,14 +104,18 @@ class ThreatIntelligence:
 
     def _is_private_ip(self, ip: str) -> bool:
         """Kiểm tra xem IP có phải là private/local không."""
-        parts = ip.split('.')
-        if len(parts) != 4:
+        try:
+            parts = ip.split('.')
+            if len(parts) != 4:
+                return False
+            first_octet = int(parts[0])
+            second_octet = int(parts[1])
+            return (first_octet == 10 or 
+                    (first_octet == 172 and 16 <= second_octet <= 31) or
+                    (first_octet == 192 and second_octet == 168) or
+                    first_octet == 127)
+        except (ValueError, IndexError):
             return False
-        first_octet = int(parts[0])
-        return (first_octet == 10 or 
-                (first_octet == 172 and 16 <= int(parts[1]) <= 31) or
-                (first_octet == 192 and int(parts[1]) == 168) or
-                first_octet == 127)
 
     def _is_benign_domain(self, domain: str) -> bool:
         """Kiểm tra xem domain có phải là domain phổ biến/không đáng ngờ không."""

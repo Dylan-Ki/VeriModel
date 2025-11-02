@@ -9,7 +9,6 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.syntax import Syntax
 from rich import box
 from typing import Optional
 
@@ -75,13 +74,13 @@ def scan(
     # ============ QUÉT TĨNH ============
     if not dynamic_only:
         console.print("[bold blue]📊 Đang chạy quét tĩnh...[/bold blue]")
-    static_scanner = StaticScanner()
-    static_result = static_scanner.scan_file(file_path)
-    results["static"] = static_result
+        static_scanner = StaticScanner()
+        static_result = static_scanner.scan_file(file_path)
+        results["static"] = static_result
 
-    # Hiển thị kết quả quét tĩnh
-    _display_static_results(static_result, verbose)
-    console.print()
+        # Hiển thị kết quả quét tĩnh
+        _display_static_results(static_result, verbose)
+        console.print()
 
     # ============ QUÉT ĐỘNG ============
     if not static_only:
@@ -173,9 +172,10 @@ def convert(
 @app.command()
 def threat_intel(
     file_path: Optional[Path] = typer.Option(None, "--file", "-f", help="Đường dẫn file để phân tích"),
-    hash: Optional[str] = typer.Option(None, "--hash", help="Hash để tra cứu (MD5, SHA1, SHA256)"),
+    file_hash: Optional[str] = typer.Option(None, "--hash", help="Hash để tra cứu (MD5, SHA1, SHA256)"),
     ip: Optional[str] = typer.Option(None, "--ip", help="IP address để tra cứu"),
     domain: Optional[str] = typer.Option(None, "--domain", "-d", help="Domain để tra cứu"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Hiển thị chi tiết đầy đủ"),
 ):
     """
     🕵️  Tra cứu Threat Intelligence từ VirusTotal.
@@ -188,7 +188,7 @@ def threat_intel(
         console.print("[yellow]⚠️  Không có VirusTotal API key.[/yellow]")
         console.print("[dim]Đặt VIRUSTOTAL_API_KEY environment variable để sử dụng tính năng này.[/dim]")
         console.print()
-        if not any([file_path, hash, ip, domain]):
+        if not any([file_path, file_hash, ip, domain]):
             raise typer.Exit(code=1)
     
     console.print()
@@ -196,9 +196,9 @@ def threat_intel(
     console.print()
     
     # Query hash
-    if hash:
-        console.print(f"[blue]Đang tra cứu hash: {hash[:16]}...[/blue]")
-        result = ti.query_virustotal_hash(hash)
+    if file_hash:
+        console.print(f"[blue]Đang tra cứu hash: {file_hash[:16]}...[/blue]")
+        result = ti.query_virustotal_hash(file_hash)
         if result:
             if result.get("found") and result.get("positives", 0) > 0:
                 console.print(f"[red]🚨 Hash được phát hiện bởi {result['positives']}/{result['total']} engines[/red]")
@@ -243,7 +243,7 @@ def threat_intel(
         
         console.print(f"[blue]Đang phân tích file: {file_path.name}[/blue]")
         result = ti.analyze_file(file_path, check_vt=True)
-        _display_threat_intel_results(result, verbose=True)
+        _display_threat_intel_results(result, verbose)
 
 
 @app.command()
@@ -421,9 +421,9 @@ def _display_threat_intel_results(result: dict, verbose: bool):
             for h in iocs["hashes"][:5]:  # Limit
                 console.print(f"  [dim]{h[:32]}...[/dim]" if len(h) > 32 else f"  [dim]{h}[/dim]")
         if iocs.get("ips"):
-            console.print("\n[dim]IPs: {', '.join(iocs['ips'][:5])}[/dim]")
+            console.print(f"\n[dim]IPs: {', '.join(iocs['ips'][:5])}[/dim]")
         if iocs.get("domains"):
-            console.print("\n[dim]Domains: {', '.join(iocs['domains'][:5])}[/dim]")
+            console.print(f"\n[dim]Domains: {', '.join(iocs['domains'][:5])}[/dim]")
 
 
 def _display_final_verdict(results: dict):

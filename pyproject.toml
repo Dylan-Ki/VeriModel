@@ -19,10 +19,24 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.10"
+# Core web dependencies
+fastapi = "^0.104.0"
+uvicorn = {extras = ["standard"], version = "^0.24.0"}
+jinja2 = "^3.1.0"
+python-multipart = "^0.0.6"
+# CLI dependencies
 typer = {extras = ["all"], version = "^0.9.0"}
 rich = "^13.7.0"
-docker = "^7.0.0"       # Thư viện mới
-yara-python = "^4.5.0"  # Thư viện mới
+# Scanner dependencies
+docker = "^7.0.0"
+yara-python = "^4.5.0"
+# Threat Intelligence
+requests = "^2.31.0"
+# Safetensors (optional)
+safetensors = "^0.4.0"
+
+[tool.poetry.extras]
+torch = ["torch>=2.0.0"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"

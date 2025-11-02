@@ -4,9 +4,11 @@ FastAPI Server for VeriModel
 RESTful API server cung cấp các endpoints để scan, convert, và query threat intelligence.
 """
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form, BackgroundTasks
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form, BackgroundTasks, Request
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel
 from typing import Optional, List
 from pathlib import Path
@@ -19,6 +21,17 @@ from verimodel.static_scanner import StaticScanner
 from verimodel.dynamic_scanner import DynamicScanner
 from verimodel.threat_intelligence import ThreatIntelligence
 from verimodel.safetensors_converter import SafetensorsConverter
+
+
+def cleanup_file_delayed(file_path: str):
+    """Cleanup file sau một khoảng thời gian để đảm bảo client đã download xong."""
+    import time
+    time.sleep(5)  # Đợi 5 giây
+    try:
+        if os.path.exists(file_path):
+            os.unlink(file_path)
+    except Exception:
+        pass  # Ignore cleanup errors
 
 
 app = FastAPI(
@@ -35,6 +48,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Templates và static files
+templates_dir = Path(__file__).parent.parent / "web_templates"
+if not templates_dir.exists():
+    templates_dir.mkdir(parents=True, exist_ok=True)
+jinja_env = Environment(loader=FileSystemLoader(str(templates_dir)))
+
+static_dir = Path(__file__).parent.parent / "static"
+if not static_dir.exists():
+    static_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # Initialize scanners
 static_scanner = StaticScanner()
@@ -65,9 +89,15 @@ class ThreatIntelRequest(BaseModel):
     domain: Optional[str] = None
 
 
-@app.get("/")
-async def root():
-    """Root endpoint."""
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    """Root endpoint - Web UI."""
+    template = jinja_env.get_template("index.html")
+    return HTMLResponse(content=template.render())
+
+@app.get("/api")
+async def api_info():
+    """API info endpoint."""
     return {
         "service": "VeriModel API",
         "version": "0.2.0",
@@ -185,6 +215,7 @@ async def scan_file(
 
 @app.post("/api/v1/convert")
 async def convert_to_safetensors(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     safe_mode: bool = Form(True),
     output_filename: Optional[str] = Form(None)
@@ -238,6 +269,10 @@ async def convert_to_safetensors(
         # Trả về file
         if os.path.exists(result["output_path"]):
             temp_output_path = result["output_path"]
+            # Schedule cleanup sau khi response được gửi
+            background_tasks.add_task(os.unlink, temp_file_path)
+            background_tasks.add_task(cleanup_file_delayed, temp_output_path)
+            
             return FileResponse(
                 result["output_path"],
                 filename=Path(result["output_path"]).name,
@@ -251,9 +286,13 @@ async def convert_to_safetensors(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi khi chuyển đổi: {str(e)}")
     finally:
-        # Cleanup temp files (sẽ được xóa sau khi response được gửi)
-        # Trong production nên dùng background task để cleanup
-        pass
+        # Cleanup input file ngay lập tức nếu có lỗi
+        if temp_file_path and os.path.exists(temp_file_path):
+            if not (temp_output_path and os.path.exists(temp_output_path)):
+                try:
+                    os.unlink(temp_file_path)
+                except Exception:
+                    pass
 
 
 @app.post("/api/v1/threat-intel")
@@ -329,5 +368,8 @@ async def get_file_info(file_path: str):
 
 if __name__ == "__main__":
     import uvicorn
+    print("🚀 Starting VeriModel Server...")
+    print("📡 Access at: http://localhost:8000 or http://127.0.0.1:8000")
+    print("⚠️  Do NOT use 0.0.0.0 in browser - use localhost instead!\n")
     uvicorn.run(app, host="0.0.0.0", port=8000)
 

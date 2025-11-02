@@ -184,9 +184,13 @@ except Exception as e:
             )
 
             # Đợi container thực thi với timeout
+            result = None
+            returncode = -1
             try:
                 result = container.wait(timeout=timeout)
                 logs = container.logs(stdout=True, stderr=True).decode("utf-8")
+                # Phân tích kết quả
+                returncode = result.get('StatusCode', -1) if isinstance(result, dict) else -1
             except (subprocess.TimeoutExpired, ReadTimeout):
                 container.kill()
                 threats.append({
@@ -195,9 +199,7 @@ except Exception as e:
                     "description": f"Model không hoàn thành trong {timeout} giây (có thể là vòng lặp vô hạn hoặc hành vi đáng ngờ)",
                 })
                 logs = container.logs(stdout=True, stderr=True).decode("utf-8")
-            
-            # Phân tích kết quả
-            returncode = result.get('StatusCode', -1) if isinstance(result, dict) else -1
+                returncode = -1
             
             if returncode != 0:
                 threats.append({
