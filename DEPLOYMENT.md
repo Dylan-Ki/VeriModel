@@ -5,10 +5,10 @@ Tài liệu này hướng dẫn cách deploy ứng dụng VeriModel lên các n�
 ## 📋 Mục lục
 
 1. [Tổng quan](#tổng-quan)
-2. [Deploy lên Vercel (Khuyến nghị)](#deploy-lên-vercel)
-3. [Deploy lên Render](#deploy-lên-render)
-4. [Deploy lên Railway](#deploy-lên-railway)
-5. [Deploy lên Heroku](#deploy-lên-heroku)
+2. [Deploy lên Render](#deploy-lên-render)
+3. [Deploy lên Railway](#deploy-lên-railway)
+4. [Deploy lên Heroku](#deploy-lên-heroku)
+5. [Desktop Application](#desktop-application)
 6. [Cấu hình tên miền tùy chỉnh](#cấu-hình-tên-miền)
 7. [Giới hạn và Lưu ý](#giới-hạn-và-lưu-ý)
 8. [Checklist Demo](#checklist-demo)
@@ -25,85 +25,14 @@ VeriModel là một ứng dụng FastAPI có thể được deploy lên nhiều 
 - **Safetensors Converter**: ⚠️ Hoạt động nhưng có thể gặp vấn đề về kích thước với PyTorch
 - **Web UI**: ✅ Hoạt động đầy đủ
 
-### ❌ Tính năng KHÔNG hoạt động trên cloud:
-- **Quét động (Dynamic Scanning)**: ❌ Yêu cầu Docker, không khả dụng trên Vercel/Render/Heroku
-
----
-
-## Deploy lên Vercel
-
-Vercel là nền tảng phổ biến nhất cho các ứng dụng FastAPI với deploy miễn phí và hiệu năng tốt.
-
-### Yêu cầu:
-- Tài khoản Vercel (đăng ký tại [vercel.com](https://vercel.com))
-- Git repository trên GitHub/GitLab/Bitbucket
-- Node.js (để cài đặt Vercel CLI - tùy chọn)
-
-### Cách 1: Deploy qua Vercel Dashboard (Khuyến nghị)
-
-1. **Chuẩn bị repository:**
-   ```bash
-   # Đảm bảo các file sau đã có trong repo:
-   # - vercel.json
-   # - api/index.py
-   # - requirements.txt
-   # - runtime.txt
-   ```
-
-2. **Đăng nhập Vercel:**
-   - Truy cập [vercel.com](https://vercel.com)
-   - Đăng nhập bằng GitHub/GitLab/Bitbucket
-
-3. **Import Project:**
-   - Click "Add New Project"
-   - Chọn repository VeriModel
-   - Vercel sẽ tự động phát hiện cấu hình từ `vercel.json`
-
-4. **Cấu hình Environment Variables (Tùy chọn):**
-   - Trong Project Settings → Environment Variables
-   - Thêm `VIRUSTOTAL_API_KEY` nếu muốn sử dụng Threat Intelligence
-
-5. **Deploy:**
-   - Click "Deploy"
-   - Đợi quá trình build hoàn tất (thường 2-5 phút)
-
-6. **Lấy URL:**
-   - Sau khi deploy xong, bạn sẽ có URL dạng: `https://your-project.vercel.app`
-   - URL này có thể được sử dụng ngay hoặc cấu hình tên miền tùy chỉnh
-
-### Cách 2: Deploy qua Vercel CLI
-
-```bash
-# Cài đặt Vercel CLI (cần Node.js)
-npm i -g vercel
-
-# Đăng nhập
-vercel login
-
-# Deploy
-vercel
-
-# Deploy production
-vercel --prod
-```
-
-### Cấu trúc file cần thiết:
-
-```
-VeriModel/
-├── api/
-│   └── index.py          # Entry point cho Vercel
-├── vercel.json           # Cấu hình Vercel
-├── requirements.txt      # Python dependencies
-├── runtime.txt           # Python version
-└── verimodel/            # Source code
-```
+### ❌ Tính năng KHÔNG hoạt động trên một số cloud platforms:
+- **Quét động (Dynamic Scanning)**: ❌ Yêu cầu Docker, không khả dụng trên một số serverless platforms
 
 ---
 
 ## Deploy lên Render
 
-Render là một nền tảng thay thế tốt cho Vercel, hỗ trợ Docker và có free tier.
+Render là một nền tảng tốt cho các ứng dụng FastAPI, hỗ trợ Docker và có free tier.
 
 ### Yêu cầu:
 - Tài khoản Render (đăng ký tại [render.com](https://render.com))
@@ -207,13 +136,11 @@ Heroku là một lựa chọn cổ điển nhưng vẫn hoạt động tốt.
 
 ## Cấu hình tên miền
 
-### Vercel
+### Custom Domain Configuration
 
-1. Vào Project Settings → Domains
+1. Vào Project Settings → Domains trên platform bạn đang sử dụng
 2. Thêm domain của bạn (ví dụ: `verimodel.yourdomain.com`)
-3. Thêm DNS records như hướng dẫn:
-   - CNAME: `verimodel` → `cname.vercel-dns.com`
-   - Hoặc A record nếu dùng root domain
+3. Thêm DNS records như hướng dẫn của platform
 
 ### Render
 
@@ -231,13 +158,11 @@ Heroku là một lựa chọn cổ điển nhưng vẫn hoạt động tốt.
 
 ## Giới hạn và Lưu ý
 
-### Vercel:
-- ✅ **Free tier**: 100GB bandwidth/tháng, unlimited requests
-- ⚠️ **Giới hạn**: 
-  - Function timeout: 60 giây (hobby), 300 giây (pro)
-  - File upload: 4.5MB (hobby), 50MB (pro)
-  - Memory: 1GB (hobby), 3GB (pro)
-- ❌ **Không hỗ trợ Docker**: Dynamic scanning sẽ không hoạt động
+### Platform Limitations:
+
+**Serverless Platforms (không hỗ trợ Docker)**:
+- ⚠️ Dynamic scanning sẽ không hoạt động
+- ⚠️ Có giới hạn về file size và timeout
 
 ### Render:
 - ✅ **Free tier**: 750 giờ/tháng
@@ -251,8 +176,8 @@ Heroku là một lựa chọn cổ điển nhưng vẫn hoạt động tốt.
 ### Lưu ý quan trọng:
 
 1. **Dynamic Scanning**: 
-   - Chỉ hoạt động trên các platform hỗ trợ Docker (Render, Railway, AWS, GCP)
-   - Trên Vercel, tính năng này sẽ tự động bị vô hiệu hóa và hiển thị thông báo
+   - Chỉ hoạt động trên các platform hỗ trợ Docker (Render, Railway, AWS, GCP, hoặc local desktop app)
+   - Trên serverless platforms không hỗ trợ Docker, tính năng này sẽ tự động bị vô hiệu hóa
 
 2. **File Size**:
    - Các file model lớn (>10MB) có thể gặp vấn đề upload
@@ -268,7 +193,7 @@ Heroku là một lựa chọn cổ điển nhưng vẫn hoạt động tốt.
 
 5. **Security**:
    - Đảm bảo CORS được cấu hình đúng cho production
-   - Sử dụng HTTPS (tự động với Vercel/Render/Railway)
+   - Sử dụng HTTPS (tự động với các platform hiện đại)
 
 ---
 
@@ -278,9 +203,7 @@ Heroku là một lựa chọn cổ điển nhưng vẫn hoạt động tốt.
 
 - [ ] Đảm bảo code đã được test kỹ trên local
 - [ ] Kiểm tra `requirements.txt` đầy đủ dependencies
-- [ ] Đảm bảo có `vercel.json` (nếu dùng Vercel)
-- [ ] Đảm bảo có `api/index.py` (nếu dùng Vercel)
-- [ ] Đảm bảo có `runtime.txt` với Python version
+- [ ] Đảm bảo có `runtime.txt` với Python version (cho web deployment)
 - [ ] Kiểm tra `.gitignore` không bỏ sót file quan trọng
 - [ ] Đảm bảo không commit API keys/sensitive data
 
@@ -319,11 +242,11 @@ Heroku là một lựa chọn cổ điển nhưng vẫn hoạt động tốt.
 
 ### Lỗi: "Timeout"
 - **Nguyên nhân**: File quá lớn hoặc xử lý lâu
-- **Giải pháp**: Tăng timeout trong `vercel.json` hoặc giảm kích thước file
+- **Giải pháp**: Giảm kích thước file hoặc tăng timeout trong cấu hình server
 
 ### Lỗi: "Docker not available"
-- **Nguyên nhân**: Đang deploy trên Vercel (không hỗ trợ Docker)
-- **Giải pháp**: Đây là hành vi bình thường. Dynamic scanning sẽ tự động bị disable.
+- **Nguyên nhân**: Platform không hỗ trợ Docker
+- **Giải pháp**: Dynamic scanning yêu cầu Docker. Chỉ sử dụng static scanning nếu không có Docker.
 
 ### Lỗi: "File too large"
 - **Nguyên nhân**: File upload vượt quá giới hạn
@@ -335,10 +258,10 @@ Heroku là một lựa chọn cổ điển nhưng vẫn hoạt động tốt.
 
 ## Tài liệu tham khảo
 
-- [Vercel Python Documentation](https://vercel.com/docs/concepts/functions/serverless-functions/runtimes/python)
 - [FastAPI Deployment](https://fastapi.tiangolo.com/deployment/)
 - [Render Documentation](https://render.com/docs)
 - [Railway Documentation](https://docs.railway.app/)
+- [Tauri Documentation](https://tauri.app/)
 
 ---
 
@@ -351,5 +274,5 @@ Nếu gặp vấn đề khi deploy, vui lòng:
 
 ---
 
-**Lưu ý cuối**: VeriModel được thiết kế để hoạt động tốt nhất với đầy đủ tính năng trên môi trường có Docker (VPS, dedicated server, hoặc cloud với Docker support). Deploy lên serverless platforms như Vercel sẽ chỉ hỗ trợ Static Scanning và Threat Intelligence.
+**Lưu ý cuối**: VeriModel được thiết kế để hoạt động tốt nhất với đầy đủ tính năng trên môi trường có Docker (VPS, dedicated server, hoặc cloud với Docker support). Desktop application với Tauri được khuyến nghị để có trải nghiệm tốt nhất.
 

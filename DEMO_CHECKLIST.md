@@ -8,9 +8,7 @@ Checklist này giúp đảm bảo ứng dụng sẵn sàng cho demo.
 - [ ] Tất cả code đã được test trên local
 - [ ] Không có lỗi linter (pylint, flake8)
 - [ ] `requirements.txt` đầy đủ và chính xác
-- [ ] `vercel.json` đã được cấu hình đúng (nếu dùng Vercel)
-- [ ] `api/index.py` tồn tại và đúng format (nếu dùng Vercel)
-- [ ] `runtime.txt` có Python version (3.11)
+- [ ] `runtime.txt` có Python version (3.11) - nếu deploy web
 - [ ] `.gitignore` đã cấu hình (không commit sensitive data)
 - [ ] Environment variables đã được document
 
@@ -30,15 +28,20 @@ Checklist này giúp đảm bảo ứng dụng sẵn sàng cho demo.
 
 ## 🚀 Deployment Checklist
 
-### Vercel (Khuyến nghị)
-- [ ] Đã tạo tài khoản Vercel
+### Web Deployment Platforms
+- [ ] Đã chọn platform phù hợp (Render, Railway, Heroku, hoặc VPS)
 - [ ] Đã connect GitHub repository
-- [ ] Đã import project vào Vercel
+- [ ] Đã cấu hình project
 - [ ] Environment variables đã được set (VIRUSTOTAL_API_KEY)
 - [ ] Build thành công không có lỗi
 - [ ] URL deployment đã hoạt động
 
-### Alternative Platforms
+### Desktop Application (Khuyến nghị)
+- [ ] Đã setup Tauri project
+- [ ] Đã build và test desktop app
+- [ ] Đã kiểm tra các tính năng hoạt động
+
+### Alternative Web Platforms
 - [ ] Render: Đã cấu hình `render.yaml` hoặc qua dashboard
 - [ ] Railway: Đã cấu hình `railway.json` hoặc qua dashboard
 - [ ] Heroku: Đã tạo `Procfile` và deploy
@@ -175,7 +178,7 @@ Checklist này giúp đảm bảo ứng dụng sẵn sàng cho demo.
    - Tra cứu hash hoặc IP
    - Hiển thị kết quả VirusTotal
 5. **Giải thích Dynamic Scanning**:
-   - "Dynamic scanning yêu cầu Docker, không khả dụng trên Vercel"
+   - "Dynamic scanning yêu cầu Docker, không khả dụng trên serverless platforms"
    - "Nhưng static scanning đã rất hiệu quả"
 6. **Kết luận**: "VeriModel giúp bảo vệ khỏi RCE attacks trong pickle files"
 
@@ -183,7 +186,7 @@ Checklist này giúp đảm bảo ứng dụng sẵn sàng cho demo.
 
 ## ❌ Known Limitations for Cloud Demo
 
-1. **Dynamic Scanning**: Không hoạt động trên Vercel (cần Docker)
+1. **Dynamic Scanning**: Không hoạt động trên serverless platforms không hỗ trợ Docker (cần Docker)
    - ✅ Workaround: Chỉ sử dụng static scanning
    - ✅ Message hiển thị rõ ràng cho user
 
