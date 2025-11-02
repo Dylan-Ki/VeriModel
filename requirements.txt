@@ -1,23 +1,26 @@
-# Core dependencies (bắt buộc cho Vercel)
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-jinja2>=3.1.0
-python-multipart>=0.0.6
+# ================================
+# VeriModel Requirements - Vercel Optimized
+# ================================
 
-# CLI dependencies (có thể bỏ qua trên Vercel nếu cần giảm size)
-rich>=10.0.0
-typer>=0.9.0
+# Core Web Framework (BẮT BUỘC)
+fastapi==0.104.1
+uvicorn==0.24.0
+jinja2==3.1.2
+python-multipart==0.0.6
 
-# Scanner dependencies
-yara-python>=4.5.0
-# docker>=7.0.0  # ❌ BỎ: Không cần thiết trên Vercel (không có Docker)
+# Scanner Dependencies (BẮT BUỘC)
+yara-python==4.5.0
 
-# Threat Intelligence
-requests>=2.31.0
+# Threat Intelligence (BẮT BUỘC)
+requests==2.31.0
 
-# Safetensors converter (TÙY CHỌN - có thể bỏ để giảm size)
-# safetensors>=0.4.0
-# torch>=2.0.0  # ⚠️ RẤT NẶNG (~500MB+) - chỉ bật nếu thực sự cần
+# ================================
+# KHÔNG BAO GỒM (để giảm size):
+# - docker (không hỗ trợ trên Vercel)
+# - torch (quá nặng ~500MB+)
+# - safetensors (không cần nếu không convert)
+# - rich, typer (CLI - không cần trên web)
+# ================================
 
 # ============================================
 # KHUYẾN NGHỊ CHO VERCEL DEPLOYMENT:
