@@ -366,11 +366,11 @@ Dự án này được phân phối dưới giấy phép MIT. Xem file `LICENSE`
 
 ## 💬 Liên hệ
 
-**Tác giả**: Your Name
+**Tác giả**: Trần Tuấn Anh
 
-**Email**: your.email@example.com
+**Email**: dyltran3@gmail.com
 
-**GitHub**: [@yourusername](https://github.com/yourusername)
+**GitHub**: https://github.com/Dylan-Ki
 
 ---
 
