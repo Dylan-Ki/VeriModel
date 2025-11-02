@@ -33,42 +33,34 @@ ENV/
 *.swo
 *~
 
-# Environment variables
-.env
-.env.local
-.env.*.local
-
-# Logs
-*.log
-
 # OS
 .DS_Store
 Thumbs.db
 
-# VeriModel specific
-demo_models/*.pkl
-demo_models/*.pth
-test_models/*.pkl
-test_models/*.pth
-malicious_*.pkl
-malicious_*.pth
-*.spec
+# Tauri
+src-tauri/target/
+src-tauri/Cargo.lock
 
-# Temporary files
-tmp/
-temp/
-*.tmp
+# Node
+node_modules/
+package-lock.json
+yarn.lock
 
-# Vercel
-.vercel
+# Build outputs
+dist/
+target/
 
-# Coverage
-htmlcov/
-.coverage
-.coverage.*
-.pytest_cache/
+# Logs
+*.log
 
-# Docker
-*.dockerfile
-.dockerignore
+# Environment
+.env
+.env.local
 
+# Test files (keep structure but ignore generated)
+*.pkl
+*.pth
+!demo_models/*.pkl
+!demo_models/*.pth
+!test_models/*.pkl
+!test_models/*.pth
