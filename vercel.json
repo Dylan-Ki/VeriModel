@@ -3,7 +3,10 @@
   "builds": [
     {
       "src": "api/index.py",
-      "use": "@vercel/python"
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
     }
   ],
   "routes": [
@@ -17,13 +20,18 @@
     }
   ],
   "env": {
-    "PYTHON_VERSION": "3.11"
+    "PYTHON_VERSION": "3.11",
+    "VIRUSTOTAL_API_KEY": "@virustotal_api_key"
   },
   "functions": {
     "api/index.py": {
       "maxDuration": 60,
-      "memory": 3008
+      "memory": 3008,
+      "includeFiles": "verimodel/rules/**"
     }
+  },
+  "regions": ["sin1"],
+  "github": {
+    "silent": true
   }
 }
-
