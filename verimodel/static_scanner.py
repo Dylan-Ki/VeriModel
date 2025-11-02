@@ -1,27 +1,54 @@
+"""
+Static Scanner Module (Vercel-compatible)
+
+Đảm bảo YARA rules được load đúng trên Vercel serverless environment.
+"""
+
 import pickletools
 from pathlib import Path
 from typing import List, Dict, Tuple
-import yara # Thư viện mới
-import zipfile # Để xử lý file .pth
+import yara
+import zipfile
 import io
+import os
 
-# Đường dẫn đến file quy tắc YARA
-YARA_RULES_PATH = Path(__file__).parent / "rules" / "pickle.yar"
+# Tìm đường dẫn YARA rules (hỗ trợ cả local và Vercel)
+def find_yara_rules_path():
+    """Tìm đường dẫn đến YARA rules file."""
+    # Thử các đường dẫn có thể có
+    possible_paths = [
+        Path(__file__).parent / "rules" / "pickle.yar",  # Local development
+        Path("/var/task/verimodel/rules/pickle.yar"),    # Vercel serverless
+        Path(os.getcwd()) / "verimodel" / "rules" / "pickle.yar",  # Alternative
+    ]
+    
+    for path in possible_paths:
+        if path.exists():
+            return path
+    
+    # Nếu không tìm thấy, raise error với thông tin debug
+    raise FileNotFoundError(
+        f"Không tìm thấy file quy tắc YARA. Đã thử:\n" + 
+        "\n".join([f"  - {p}" for p in possible_paths]) +
+        f"\n\nCurrent directory: {os.getcwd()}" +
+        f"\nFile location: {Path(__file__).parent}"
+    )
 
 
 class StaticScanner:
-    """
-    Phân tích tĩnh file pickle bằng YARA và pickletools.
-    """
+    """Phân tích tĩnh file pickle bằng YARA và pickletools."""
     
     def __init__(self):
         self.findings: list[Dict] = []
         try:
-            if not YARA_RULES_PATH.exists():
-                raise FileNotFoundError(f"Không tìm thấy file quy tắc YARA: {YARA_RULES_PATH}")
-            self.yara_rules = yara.compile(filepath=str(YARA_RULES_PATH))
+            yara_rules_path = find_yara_rules_path()
+            self.yara_rules = yara.compile(filepath=str(yara_rules_path))
+            print(f"✅ YARA rules loaded from: {yara_rules_path}")
+        except FileNotFoundError as e:
+            print(f"❌ YARA rules không tìm thấy: {e}")
+            self.yara_rules = None
         except Exception as e:
-            print(f"Lỗi nghiêm trọng: Không thể compile quy tắc YARA: {e}")
+            print(f"❌ Lỗi khi compile YARA rules: {e}")
             self.yara_rules = None
 
     def _scan_content(self, content: bytes, file_name: str) -> Tuple[List, List, List]:
@@ -53,10 +80,17 @@ class StaticScanner:
                     "description": f"Lỗi khi quét YARA: {e}",
                     "file_context": file_name,
                 })
+        else:
+            warnings.append({
+                "type": "YARA_UNAVAILABLE",
+                "severity": "LOW",
+                "description": "YARA rules không khả dụng. Chỉ quét bằng pickletools.",
+                "file_context": file_name,
+            })
 
-        # 2. Phân tích Opcodes (vẫn hữu ích để đếm)
+        # 2. Phân tích Opcodes
         try:
-            opcodes = list(pickletools.genops(content))
+            opcodes = list(pickletools.genops(io.BytesIO(content)))
             details = [
                 {
                     "position": pos,
@@ -66,7 +100,6 @@ class StaticScanner:
                 for opcode, arg, pos in opcodes
             ]
         except Exception:
-            # File có thể không phải là pickle (ví dụ: file zip .pth)
             pass 
             
         return threats, warnings, details
@@ -76,13 +109,6 @@ class StaticScanner:
         self.findings = []
         file_path = Path(file_path)
         
-        if not self.yara_rules:
-             return {
-                "is_safe": False,
-                "error": "Lỗi cấu hình: Không thể tải quy tắc YARA.",
-                "threats": [], "warnings": [], "details": [],
-            }
-
         if not file_path.exists():
             return {
                 "is_safe": False,
@@ -102,10 +128,12 @@ class StaticScanner:
                 try:
                     with zipfile.ZipFile(file_path, 'r') as zf:
                         for sub_file_name in zf.namelist():
-                            # Chỉ quét các file có khả năng chứa pickle
                             if sub_file_name.endswith(('.pkl', '/data.pkl', '.pickle')):
                                 content = zf.read(sub_file_name)
-                                threats, warnings, details = self._scan_content(content, f"{file_path.name}/{sub_file_name}")
+                                threats, warnings, details = self._scan_content(
+                                    content, 
+                                    f"{file_path.name}/{sub_file_name}"
+                                )
                                 all_threats.extend(threats)
                                 all_warnings.extend(warnings)
                                 all_details.extend(details)
@@ -126,13 +154,12 @@ class StaticScanner:
                 all_details.extend(details)
             
             else:
-                # Quét bất kỳ file nào khác (ví dụ: .h5, .bin)
+                # Quét bất kỳ file nào khác
                 content = file_path.read_bytes()
                 threats, warnings, details = self._scan_content(content, file_path.name)
                 all_threats.extend(threats)
                 all_warnings.extend(warnings)
                 all_details.extend(details)
-
 
         except Exception as e:
             return {
@@ -148,7 +175,7 @@ class StaticScanner:
             "is_safe": is_safe,
             "threats": all_threats,
             "warnings": all_warnings,
-            "details": all_details, # Tổng số opcodes
+            "details": all_details,
             "total_opcodes": len(all_details),
             "total_threats": len(all_threats),
         }
