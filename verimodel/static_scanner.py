@@ -1,7 +1,7 @@
 """
-Static Scanner Module (Vercel-compatible)
+Static Scanner Module
 
-Đảm bảo YARA rules được load đúng trên Vercel serverless environment.
+Phân tích tĩnh file pickle bằng YARA và pickletools.
 """
 
 import pickletools
@@ -12,15 +12,14 @@ import zipfile
 import io
 import os
 
-# Tìm đường dẫn YARA rules (hỗ trợ cả local và Vercel)
+# Tìm đường dẫn YARA rules
 def find_yara_rules_path():
     """Tìm đường dẫn đến YARA rules file."""
     # Thử các đường dẫn có thể có
     possible_paths = [
-        Path(__file__).parent / "rules" / "pickle.yar",  # Local development
-        Path("/var/task/verimodel/rules/pickle.yar"),    # Vercel serverless
+        Path(__file__).parent / "rules" / "pickle.yar",  # Standard location
         Path(os.getcwd()) / "verimodel" / "rules" / "pickle.yar",  # Alternative
-        Path("/var/task") / "verimodel" / "rules" / "pickle.yar",  # Vercel absolute
+        Path(__file__).parent.parent.parent / "verimodel" / "rules" / "pickle.yar",  # Project root
     ]
     
     for path in possible_paths:
@@ -34,16 +33,6 @@ def find_yara_rules_path():
         print(f"  - {p} (exists: {p.exists()})")
     print(f"Current directory: {os.getcwd()}")
     print(f"__file__ location: {Path(__file__).parent}")
-    
-    # List files để debug
-    try:
-        task_dir = Path("/var/task")
-        if task_dir.exists():
-            print(f"Files in /var/task:")
-            for item in task_dir.rglob("*.yar"):
-                print(f"  - {item}")
-    except Exception as e:
-        print(f"Cannot list /var/task: {e}")
     
     return None  # Trả về None thay vì raise error
 
