@@ -1,3 +1,15 @@
+"""
+DEPRECATED: Tkinter GUI for VeriModel
+
+This module is deprecated in favor of the Tauri desktop application.
+The Tauri app provides a modern, cross-platform desktop experience with
+better performance and a cyber-themed UI.
+
+For desktop application, use the Tauri-based app instead.
+See README.md for instructions on building and running the Tauri desktop app.
+
+This module is kept for backward compatibility but will not be maintained.
+"""
 
 import sys
 import shutil
@@ -10,13 +22,37 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich import box
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, scrolledtext
+
+# Tkinter imports with deprecation warning
+try:
+    import tkinter as tk
+    from tkinter import ttk, filedialog, messagebox, scrolledtext
+except ImportError:
+    tk = None
+    print("⚠️ Tkinter GUI is deprecated. Please use the Tauri desktop application instead.")
+    print("⚠️ Install Tauri dependencies and run: npm run dev")
 
 class VeriModelGUI:
+    """
+    DEPRECATED: Use Tauri desktop app instead.
+    
+    This GUI is deprecated. The Tauri desktop application provides:
+    - Modern cyber-themed UI
+    - Better performance
+    - Cross-platform support
+    - Native desktop experience
+    """
     def __init__(self, root):
+        if tk is None:
+            raise ImportError("Tkinter not available. This GUI is deprecated. Use Tauri desktop app instead.")
+        
         self.root = root
-        self.root.title("🛡️ VeriModel - AI Supply Chain Firewall")
+        self.root.title("🛡️ VeriModel - AI Supply Chain Firewall (DEPRECATED)")
+        # Show deprecation warning
+        print("⚠️ WARNING: Tkinter GUI is deprecated.")
+        print("⚠️ Please use the Tauri desktop application for better experience.")
+        print("⚠️ See README.md for Tauri setup instructions.")
+        
         self.console = Console()
         self.file_path = None
         self.analyze_file_path = None

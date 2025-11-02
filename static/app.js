@@ -1,6 +1,10 @@
 // VeriModel Web UI JavaScript
 
-const API_BASE = '/api/v1';
+// Detect if running in Tauri
+const isTauri = typeof window.__TAURI__ !== 'undefined';
+
+// API base URL - use localhost for Tauri desktop app
+const API_BASE = isTauri ? 'http://localhost:8000/api/v1' : '/api/v1';
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
