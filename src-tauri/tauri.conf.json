@@ -2,7 +2,7 @@
   "build": {
     "beforeDevCommand": "",
     "beforeBuildCommand": "",
-    "devPath": "../web_templates",
+    "devPath": "http://localhost:8000",
     "distDir": "../web_templates",
     "withGlobalTauri": false
   },
